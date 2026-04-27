@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ระบบจองที่พัก - Store Operations Audit</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--P:#1a56db;--PD:#1347bc;--PL:#e8f0fe;--G:#059669;--W:#d97706;--R:#dc2626;--BG:#f0f4f8;--BD:#e2e8f0;--T:#1e293b;--M:#64748b;--SW:220px;--TH:54px;--NH:60px;--RD:12px}
+html,body{font-family:'Sarabun',sans-serif;background:var(--BG);color:var(--T);min-height:100%;overflow-x:hidden}
+/* SCREEN SYSTEM - 3 screens, only one visible at a time */
+.scr{display:none}
+#SL{display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;background:linear-gradient(135deg,#1347bc,#0ea5e9);z-index:9999;gap:14px}
+#SA{display:flex;flex-direction:row;height:100vh;height:100dvh;overflow:hidden}
+/* spinner */
+.sp{width:38px;height:38px;border:3px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp-txt{color:white;font-size:14px;font-family:'Sarabun',sans-serif;opacity:.85}
+/* LOGIN */
+#SN{display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;background:linear-gradient(135deg,#1347bc,#0ea5e9);padding:16px}
+.lb{background:white;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.ll{text-align:center;margin-bottom:24px}
+.li{width:56px;height:56px;background:linear-gradient(135deg,#1347bc,#0ea5e9);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.li svg{width:28px;height:28px;fill:white}
+.ll h2{font-family:'Prompt',sans-serif;font-size:18px;font-weight:600;color:var(--T)}
+.ll p{font-size:12.5px;color:var(--M);margin-top:3px}
+.lf{margin-bottom:14px}
+.lf label{display:block;font-size:11.5px;font-weight:700;color:var(--M);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.lf input{width:100%;padding:13px 16px;border:1.5px solid var(--BD);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:15px;color:var(--T);outline:none;transition:border .15s;-webkit-appearance:none}
+.lf input:focus{border-color:var(--P);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.le{color:#dc2626;font-size:12.5px;margin-bottom:10px;display:none;background:#fee2e2;padding:9px 12px;border-radius:8px}
+.lbtn{width:100%;padding:14px;background:linear-gradient(90deg,#1347bc,#1a56db);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;cursor:pointer;-webkit-appearance:none}
+.lbtn:active{transform:scale(.98)}
+/* SIDEBAR */
+.sidebar{width:var(--SW);background:linear-gradient(160deg,#1347bc,#0ea5e9);display:flex;flex-direction:column;flex-shrink:0;transition:transform .25s;z-index:10}
+.la{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,.15)}
+.lic{width:36px;height:36px;background:rgba(255,255,255,.2);border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:7px}
+.lic svg{width:19px;height:19px;fill:white}
+.lt{font-family:'Prompt',sans-serif;color:white;font-size:13.5px;font-weight:600;line-height:1.2}
+.ls{color:rgba(255,255,255,.55);font-size:10px;margin-top:2px}
+.ns{padding:12px 10px;flex:1;overflow-y:auto}
+.nl{color:rgba(255,255,255,.5);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:5px;margin-top:8px}
+.ni{display:flex;align-items:center;gap:9px;padding:11px 10px;border-radius:9px;cursor:pointer;color:rgba(255,255,255,.75);font-size:13px;transition:all .15s;margin-bottom:2px;min-height:44px}
+.ni:hover,.ni.on{background:rgba(255,255,255,.18);color:white}
+.ni svg{width:17px;height:17px;fill:currentColor;flex-shrink:0}
+.nd{border:none;border-top:1px solid rgba(255,255,255,.1);margin:8px 0}
+.sf{padding:14px 10px;border-top:1px solid rgba(255,255,255,.15)}
+.su{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sav{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.25);color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.sn{color:white;font-size:12px;font-weight:600;line-height:1.3}
+.sr{color:rgba(255,255,255,.6);font-size:10px}
+.blo{width:100%;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:white;font-family:'Sarabun',sans-serif;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px}
+.blo:active{background:rgba(255,255,255,.2)}
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.tb{background:white;padding:0 14px;border-bottom:1px solid var(--BD);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:var(--TH);gap:8px}
+.tbl{display:flex;align-items:center;gap:8px;min-width:0}
+.mto{display:none;background:none;border:none;cursor:pointer;padding:8px;border-radius:8px;color:var(--T);flex-shrink:0}
+.mto svg{width:22px;height:22px;fill:currentColor;display:block}
+.pt{font-family:'Prompt',sans-serif;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps{font-size:11px;color:var(--M);margin-top:1px;display:none}
+.tbr{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sbar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--M);padding:4px 10px;background:#f0fdf4;border-radius:20px;transition:all .3s}
+.sbar.sy{background:#eff6ff;color:#1a56db}
+.sbar.se{background:#fef2f2;color:#dc2626}
+.sd{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.sbar.sy .sd{background:#1a56db;animation:bl .8s infinite}
+.sbar.se .sd{background:#dc2626}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+.rb{padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:700;flex-shrink:0}
+.ru{background:#e8f0fe;color:#1347bc}
+.ra{background:#fef3c7;color:#92400e}
+.con{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+/* BOTTOM NAV */
+.bn{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--NH);background:white;border-top:1px solid var(--BD);z-index:50;padding:0 4px;padding-bottom:env(safe-area-inset-bottom)}
+.bni{display:flex;height:100%;align-items:stretch}
+.bni-i{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--M);font-size:10px;gap:3px;min-height:44px}
+.bni-i svg{width:22px;height:22px;fill:currentColor}
+.bni-i.on{color:var(--P)}
+.bni-i.on svg{fill:var(--P)}
+/* VIEWS */
+.vw{display:none}.vw.on{display:block}
+.stitle{font-family:'Prompt',sans-serif;font-size:14px;font-weight:600;margin-bottom:12px}
+.fc{background:white;border-radius:var(--RD);border:1px solid var(--BD);padding:16px;margin-bottom:12px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fi{display:flex;flex-direction:column;gap:5px}
+.fi.fw{grid-column:1/-1}
+.fi label{font-size:11px;font-weight:700;color:var(--M);text-transform:uppercase;letter-spacing:.04em}
+input[type=date],input[type=text],input[type=number],select,textarea{font-family:'Sarabun',sans-serif;padding:11px 12px;border:1px solid var(--BD);border-radius:8px;font-size:14px;color:var(--T);background:white;transition:border .15s;outline:none;width:100%;-webkit-appearance:none;min-height:44px}
+input:focus,select:focus,textarea:focus{border-color:var(--P);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+textarea{resize:vertical;min-height:70px}
+.nb{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(90deg,#1347bc,#0ea5e9);color:white;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:8px;border:none;font-family:'Sarabun',sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;min-height:44px;-webkit-appearance:none}
+.btn:active{transform:scale(.97)}
+.bp{background:linear-gradient(90deg,#1347bc,#1a56db);color:white}
+.bo{background:white;color:var(--P);border:1.5px solid var(--P)}
+.bd{background:#dc2626;color:white}
+.be{background:linear-gradient(90deg,#059669,#10b981);color:white}
+.bs{padding:8px 14px;font-size:12px;min-height:36px}
+.brow{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+/* DROPDOWN */
+.dw{position:relative;width:100%}
+.di{width:100%;padding:11px 36px 11px 12px;border:1px solid var(--BD);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;color:var(--T);cursor:pointer;background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 10px center;appearance:none;outline:none;min-height:44px}
+.di:focus{border-color:var(--P);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.dl{position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--BD);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:400;max-height:280px;overflow-y:auto;display:none}
+.dl.op{display:block}
+.dq{padding:10px 12px;border-bottom:1px solid var(--BD);position:sticky;top:0;background:white}
+.dq input{width:100%;padding:9px 12px;border:1px solid var(--BD);border-radius:7px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;min-height:40px}
+.dq input:focus{border-color:var(--P)}
+.dgl{padding:5px 14px;font-size:10px;font-weight:700;color:var(--M);text-transform:uppercase;background:#f8fafc}
+.do{padding:12px 14px;font-size:13.5px;cursor:pointer;min-height:48px;display:flex;flex-direction:column;justify-content:center}
+.do:hover,.do:active{background:var(--PL);color:#1347bc}
+.dn{font-weight:500}.dp{font-size:11px;color:var(--M);margin-top:2px}
+.de{padding:16px;text-align:center;color:var(--M);font-size:13px}
+/* TABLE */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bt{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.bt th{background:#f8fafc;padding:9px 11px;text-align:left;font-size:10px;font-weight:700;color:var(--M);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--BD)}
+.bt td{padding:9px 11px;border-bottom:1px solid var(--BD);vertical-align:middle}
+.bt tr:last-child td{border-bottom:none}
+/* CARDS */
+.bcs{display:none}
+.bc{background:white;border-radius:var(--RD);border:1px solid var(--BD);padding:14px;margin-bottom:10px}
+.bch{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:8px}
+.bcn{font-size:13.5px;font-weight:600}
+.bcp{font-size:11px;color:var(--M);margin-top:2px}
+.bcr{display:flex;gap:6px;margin-bottom:6px;font-size:12.5px}
+.bcl{color:var(--M);min-width:65px;font-size:11.5px;flex-shrink:0}
+.bcv{color:var(--T);font-weight:500}
+.bca{display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--BD)}
+.bca .btn{flex:1}
+/* STATS */
+.sts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.st{background:white;border:1px solid var(--BD);border-radius:10px;padding:12px 14px}
+.stn{font-family:'Prompt',sans-serif;font-size:22px;font-weight:600;color:var(--P)}
+.stl{font-size:11px;color:var(--M);margin-top:2px}
+/* FILTER */
+.flt{background:white;border:1px solid var(--BD);border-radius:var(--RD);padding:12px 14px;margin-bottom:12px}
+.flr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.flr input,.flr select{flex:1;min-width:120px;padding:9px 10px;font-size:13px;border:1px solid var(--BD);border-radius:8px;min-height:40px}
+/* STATUS */
+.sb{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
+.sw{background:#fef3c7;color:#92400e}
+.so{background:#d1fae5;color:#065f46}
+.sc{background:#dbeafe;color:#1e40af}
+.sn2{background:#fee2e2;color:#991b1b}
+/* EXPORT */
+.eo{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #f1f5f9;gap:10px}
+.eo:last-child{border-bottom:none}
+.ei{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.en{font-size:13px;font-weight:600}
+.ed{font-size:11.5px;color:var(--M);margin-top:2px}
+/* MODAL */
+.mb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-end;justify-content:center}
+.mb.op{display:flex}
+.mo{background:white;border-radius:20px 20px 0 0;width:100%;max-width:560px;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.2);max-height:92vh;max-height:92dvh;display:flex;flex-direction:column}
+.mh2{width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:10px auto 0}
+.mh{padding:14px 18px;border-bottom:1px solid var(--BD);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.mh h3{font-family:'Prompt',sans-serif;font-size:15px;font-weight:600}
+.mx{background:none;border:none;cursor:pointer;color:var(--M);font-size:24px;line-height:1;padding:4px 8px;min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center}
+.mby{padding:16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.mf{padding:12px 16px;border-top:1px solid var(--BD);display:flex;gap:8px;flex-shrink:0;background:white;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-wrap:wrap}
+.ms{background:#f8fafc;border-radius:9px;padding:14px;margin-bottom:14px;border:1px solid var(--BD)}
+.mst{font-size:11px;font-weight:700;color:var(--M);text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
+/* CONFIRM */
+.cb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:16px}
+.cb.op{display:flex}
+.cbx{background:white;border-radius:18px;width:100%;max-width:340px;padding:26px 20px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.cbi{width:54px;height:54px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.cbi svg{width:28px;height:28px;fill:#dc2626}
+.cbt{font-family:'Prompt',sans-serif;font-size:16px;font-weight:600;margin-bottom:8px}
+.cbm{font-size:13px;color:var(--M);margin-bottom:22px;line-height:1.6}
+.cbb{display:flex;gap:10px;justify-content:center}
+.cbb .btn{flex:1;max-width:140px}
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:white;padding:11px 20px;border-radius:24px;font-size:13.5px;font-weight:500;z-index:9999;opacity:0;transition:all .3s;white-space:nowrap;pointer-events:none}
+.toast.sh{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.tok{background:#059669}.toast.ter{background:#dc2626}
+/* OVERLAY */
+#OV{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9}
+/* RESPONSIVE */
+@media(min-width:768px){
+  .sidebar{position:relative;transform:none!important}
+  #OV{display:none!important}
+  .bn{display:none!important}
+  .mto{display:none!important}
+  .ps{display:block}
+  .con{padding:18px 20px}
+  .mo{border-radius:16px;align-self:center;margin:16px}
+  .mb{align-items:center}
+  .mh2{display:none}
+  .toast{bottom:24px}
+  .bcs{display:none!important}
+  .tw .bt{display:table}
+}
+@media(max-width:767px){
+  :root{--SW:270px}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);z-index:100;overflow-y:auto}
+  .sidebar.op{transform:translateX(0)}
+  .mto{display:flex}
+  .bn{display:block}
+  .con{padding:12px 12px calc(var(--NH) + env(safe-area-inset-bottom) + 8px)}
+  .fg{grid-template-columns:1fr}
+  .fi.fw{grid-column:1}
+  .sts{gap:8px}
+  .stn{font-size:18px}
+  .stl{font-size:10px}
+  .bcs{display:block}
+  .tw .bt{display:none}
+}
+@media(max-width:399px){
+  .lb{padding:26px 20px}
+  .sts{grid-template-columns:1fr 1fr}
+  .sts .st:last-child{grid-column:1/-1}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="SL">
+  <div class="sp"></div>
+  <div class="sp-txt" id="SLM">กำลังโหลดระบบ...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="SN" class="scr">
+  <div class="lb">
+    <div class="ll">
+      <div class="li"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zm0-12H5V5h14v2z"/></svg></div>
+      <h2>ระบบจองที่พัก</h2><p>Store Operations Audit</p>
+    </div>
+    <div class="lf"><label>ชื่อผู้ใช้ (Username)</label><input type="text" id="LU" placeholder="กรอก Username" autocomplete="username" autocapitalize="none"></div>
+    <div class="lf"><label>รหัสผ่าน (Password)</label><input type="password" id="LP" placeholder="กรอก Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="le" id="LE">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
+    <button class="lbtn" onclick="doLogin()">เข้าสู่ระบบ</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="SA" class="scr">
+  <div id="OV" onclick="cSB()"></div>
+  <div class="sidebar" id="SB">
+    <div class="la">
+      <div class="lic"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zm0-12H5V5h14v2z"/></svg></div>
+      <div class="lt">ระบบจองที่พัก</div><div class="ls">Store Operations Audit</div>
+    </div>
+    <div class="ns">
+      <div class="nl">เมนูหลัก</div>
+      <div class="ni on" id="N0" onclick="gv(0);cSB()"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zm0-12H5V5h14v2z"/></svg>จองที่พัก</div>
+      <div class="ni" id="N1" onclick="gv(1);cSB()"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>รายการของฉัน</div>
+      <hr class="nd">
+      <div class="nl" id="NAL" style="display:none">Admin</div>
+      <div class="ni" id="N2" style="display:none" onclick="gv(2);cSB()"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>จัดการทั้งหมด</div>
+      <div class="ni" id="N3" style="display:none" onclick="gv(3);cSB()"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Export ข้อมูล</div>
+    </div>
+    <div class="sf">
+      <div class="su"><div class="sav" id="SAV">-</div><div><div class="sn" id="SNM">-</div><div class="sr" id="SRO">-</div></div></div>
+      <button class="blo" onclick="doLogout()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>ออกจากระบบ</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="tb">
+      <div class="tbl">
+        <button class="mto" onclick="oSB()"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+        <div><div class="pt" id="PT">จองที่พัก</div><div class="ps" id="PS">กรอกรายละเอียดการเดินทางและที่พัก</div></div>
+      </div>
+      <div class="tbr">
+        <div class="sbar" id="SBAR" style="display:none"><div class="sd"></div><span id="STX">พร้อมใช้งาน</span></div>
+        <div class="rb ru" id="RB">SOA</div>
+      </div>
+    </div>
+    <div class="con">
+
+      <!-- V0: จองที่พัก -->
+      <div class="vw on" id="V0">
+        <div class="fc">
+          <div class="stitle">ข้อมูลพนักงาน</div>
+          <div class="fi">
+            <label>เลือกชื่อพนักงาน</label>
+            <div class="dw" id="DW">
+              <input class="di" id="DV" readonly placeholder="🔍  ค้นหาและเลือกชื่อพนักงาน..." onclick="tDD()">
+              <div class="dl" id="DL"><div class="dq"><input type="text" id="DQ" placeholder="พิมพ์ชื่อ..." oninput="fEmp()" autocomplete="off"></div><div id="DO"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fc">
+          <div class="stitle">ข้อมูลการเดินทาง</div>
+          <div class="fg">
+            <div class="fi fw"><label>วันที่ต้องการจอง</label><input type="date" id="FD"></div>
+            <div class="fi fw"><label>สาขาที่จะไป</label><input type="text" id="FB" placeholder="เช่น ST45 กำแพงเพชร"></div>
+            <div class="fi"><label>Check-in</label><input type="date" id="FCI" onchange="cN()"></div>
+            <div class="fi"><label>Check-out</label><input type="date" id="FCO" onchange="cN()"></div>
+            <div class="fi fw"><label>จำนวนคืน (อัตโนมัติ)</label>
+              <div class="nb" id="FN"><svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2z"/></svg> เลือก Check-in และ Check-out</div>
+            </div>
+            <div class="fi fw"><label>หมายเหตุ</label><textarea id="FT" placeholder="ข้อมูลเพิ่มเติม..."></textarea></div>
+          </div>
+        </div>
+        <div class="brow">
+          <button class="btn bo" onclick="clrF()">ล้างข้อมูล</button>
+          <button class="btn bp" onclick="subB()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง</button>
+        </div>
+      </div>
+
+      <!-- V1: รายการของฉัน -->
+      <div class="vw" id="V1">
+        <div class="sts" id="MST"></div>
+        <div class="bcs" id="MCA"></div>
+        <div class="fc" style="padding:0;overflow:hidden"><div class="tw"><table class="bt"><thead><tr><th>วันที่จอง</th><th>สาขา</th><th>Check-in</th><th>Check-out</th><th>คืน</th><th>สถานะ</th><th>ชื่อที่พัก</th><th>ราคารวม</th></tr></thead><tbody id="MTB"></tbody></table></div></div>
+      </div>
+
+      <!-- V2: Admin -->
+      <div class="vw" id="V2">
+        <div class="sts" id="AST"></div>
+        <div class="flt">
+          <div style="font-size:11px;font-weight:700;color:var(--M);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">กรองข้อมูล</div>
+          <div class="flr" style="margin-bottom:8px">
+            <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--M)">ตั้งแต่</label>
+            <input type="date" id="FF" onchange="rA()">
+            <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--M)">ถึง</label>
+            <input type="date" id="FT2" onchange="rA()">
+            <button class="btn bo bs" onclick="clrR()">ล้าง</button>
+          </div>
+          <div class="flr">
+            <input type="text" id="FS" placeholder="ค้นหาชื่อ / สาขา..." oninput="rA()" style="flex:2">
+            <select id="FST" onchange="rA()" style="flex:1"><option value="">ทุกสถานะ</option><option>รอดำเนินการ</option><option>ยืนยันแล้ว</option><option>เสร็จสิ้น</option><option>ยกเลิก</option></select>
+          </div>
+        </div>
+        <div class="bcs" id="ACA"></div>
+        <div class="fc" style="padding:0;overflow:hidden"><div class="tw"><table class="bt"><thead><tr><th>ชื่อพนักงาน</th><th>R</th><th>สาขา</th><th>Check-in</th><th>Check-out</th><th>คืน</th><th>สถานะ</th><th>ชื่อที่พัก</th><th>ราคารวม</th><th>จัดการ</th></tr></thead><tbody id="ATB"></tbody></table></div></div>
+      </div>
+
+      <!-- V3: Export -->
+      <div class="vw" id="V3">
+        <div class="fc">
+          <div class="stitle">Export ข้อมูลการจอง</div>
+          <div class="eo"><div class="ei" style="background:#e8f5e9"><svg width="19" height="19" viewBox="0 0 24 24" fill="#059669"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L11 13.17l7.59-7.59L20 7l-9 9z"/></svg></div><div><div class="en">รายการจองทั้งหมด</div><div class="ed">ครบทุก Column</div></div><button class="btn be bs" onclick="exAll()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Download</button></div>
+          <div class="eo"><div class="ei" style="background:#e8f0fe"><svg width="19" height="19" viewBox="0 0 24 24" fill="#1a56db"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div><div><div class="en">สรุปรายพนักงาน</div><div class="ed">งบแยกรายคน</div></div><button class="btn be bs" onclick="exPer()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Download</button></div>
+          <div class="eo"><div class="ei" style="background:#fff3e0"><svg width="19" height="19" viewBox="0 0 24 24" fill="#d97706"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div><div><div class="en">รายการรอดำเนินการ</div><div class="ed">เฉพาะรอ Admin</div></div><button class="btn be bs" onclick="exPen()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Download</button></div>
+        </div>
+        <div style="background:white;border-radius:10px;border:1px solid var(--BD);padding:14px">
+          <div style="font-size:11px;color:var(--M);margin-bottom:8px;font-weight:700;text-transform:uppercase">ตัวอย่างข้อมูล</div>
+          <div class="tw" style="max-height:200px;overflow-y:auto"><table class="bt"><thead><tr><th>ชื่อ</th><th>R</th><th>วันจอง</th><th>สาขา</th><th>Check-in</th><th>Check-out</th><th>คืน</th><th>สถานะ</th><th>ที่พัก</th><th>รวม</th></tr></thead><tbody id="ETB"></tbody></table></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- BOTTOM NAV -->
+  <div class="bn"><div class="bni">
+    <div class="bni-i on" id="B0" onclick="gv(0)"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zm0-12H5V5h14v2z"/></svg>จองที่พัก</div>
+    <div class="bni-i" id="B1" onclick="gv(1)"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>รายการฉัน</div>
+    <div class="bni-i" id="B2" style="display:none" onclick="gv(2)"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>จัดการ</div>
+    <div class="bni-i" id="B3" style="display:none" onclick="gv(3)"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Export</div>
+  </div></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="mb" id="ME">
+  <div class="mo">
+    <div class="mh2"></div>
+    <div class="mh"><h3>แก้ไขรายการ (Admin)</h3><button class="mx" onclick="cEd()">×</button></div>
+    <div class="mby">
+      <div class="ms">
+        <div class="mst">ข้อมูลพนักงาน — แก้ไขได้ทั้งหมด</div>
+        <div class="fg">
+          <div class="fi fw"><label>ชื่อพนักงาน</label><div class="dw" id="MDW"><input class="di" id="MDV" readonly onclick="tMDD()" placeholder="เลือกพนักงาน..."><div class="dl" id="MDL"><div class="dq"><input type="text" id="MDQ" placeholder="ค้นหา..." oninput="fMEmp()" autocomplete="off"></div><div id="MDO"></div></div></div></div>
+          <div class="fi fw"><label>วันที่จอง</label><input type="date" id="MFD"></div>
+          <div class="fi fw"><label>สาขา</label><input type="text" id="MFB"></div>
+          <div class="fi"><label>Check-in</label><input type="date" id="MCI" onchange="mCN()"></div>
+          <div class="fi"><label>Check-out</label><input type="date" id="MCO" onchange="mCN()"></div>
+          <div class="fi fw"><label>จำนวนคืน</label><div class="nb" id="MN" style="font-size:12px;padding:8px 14px">—</div></div>
+          <div class="fi fw"><label>หมายเหตุ</label><textarea id="MNT"></textarea></div>
+        </div>
+      </div>
+      <div class="ms" style="background:#fffbeb;border-color:#fde68a">
+        <div class="mst" style="color:#92400e">ข้อมูลหลังบ้าน Admin</div>
+        <div class="fg">
+          <div class="fi fw"><label>สถานะ</label><select id="MST2"><option>รอดำเนินการ</option><option>ยืนยันแล้ว</option><option>เสร็จสิ้น</option><option>ยกเลิก</option></select></div>
+          <div class="fi fw"><label>ชื่อที่พัก</label><input type="text" id="MHT" placeholder="ชื่อโรงแรม / ที่พัก"></div>
+          <div class="fi"><label>ราคา/คืน (฿)</label><input type="number" id="MPR" placeholder="0" oninput="mAT()" inputmode="numeric"></div>
+          <div class="fi"><label>ราคารวม (฿)</label><input type="number" id="MTO" readonly style="background:#f8fafc"></div>
+          <div class="fi fw"><label>รีวิวที่พัก</label><textarea id="MRV"></textarea></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bd bs" onclick="askD(eId)" style="flex:0 0 auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button>
+      <div style="flex:1"></div>
+      <button class="btn bo bs" onclick="cEd()">ยกเลิก</button>
+      <button class="btn bp bs" onclick="svEd()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DEL -->
+<div class="cb" id="CD">
+  <div class="cbx">
+    <div class="cbi"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+    <div class="cbt">ยืนยันการลบ?</div>
+    <div class="cbm" id="CDM">รายการจะถูกลบถาวร</div>
+    <div class="cbb"><button class="btn bo" onclick="cConf()">ยกเลิก</button><button class="btn bd" onclick="doDel()">ลบออกเลย</button></div>
+  </div>
+</div>
+
+<div class="toast" id="TT"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* =====================================================
+   CONFIG — ใส่ Firebase databaseURL ตรงนี้
+   ===================================================== */
+var FBU='https://create-2160b-default-rtdb.asia-southeast1.firebasedatabase.app/';
+/* ตัวอย่าง: 'https://hotel-booking-soa-default-rtdb.asia-southeast1.firebasedatabase.app' */
+/* ===================================================== */
+var DBK='hbv4';
+var US={soa:{pw:'makroho',role:'user',lbl:'SOA',disp:'SOA (พนักงาน)'},admin:{pw:'adminho',role:'admin',lbl:'AD',disp:'Admin (ผู้ดูแล)'}};
+var EM=[
+{id:1,nm:'คุณ วัชระ กลางกระโทก',r:1,nk:'ตุ้ม',ps:'Regional SOA'},
+{id:2,nm:'คุณ พิชิต คันธาเวช',r:1,nk:'เอ',ps:'Zone1'},
+{id:3,nm:'คุณ ธีระพงษ์ อินจุ้มสาย',r:1,nk:'หนุ่ย',ps:'Zone2'},
+{id:4,nm:'คุณ มะลิวัลย์ โขงชัยภูมิ',r:1,nk:'เมย์',ps:'Zone3'},
+{id:5,nm:'คุณ สุมาลี หาญสว่าง',r:1,nk:'พิมพ์',ps:'Zone4'},
+{id:6,nm:'คุณ ลัดดาวัลย์ ธรรมศร',r:1,nk:'ดา',ps:'Zone5'},
+{id:7,nm:'คุณ วสุธรณ์ นิ่มนวลพงษ์',r:2,nk:'ป๊อก',ps:'Regional SOA'},
+{id:8,nm:'คุณ ภกรณ์กาญจ์ เมทินีพิศาลกุล',r:2,nk:'แอน',ps:'Zone6'},
+{id:9,nm:'คุณ ธนกร วุฒิเดชเกรียงไกร',r:2,nk:'ก๊อต',ps:'Zone7'},
+{id:10,nm:'คุณ ศุจิกา พงศากาล',r:2,nk:'ออย',ps:'Zone8'},
+{id:11,nm:'คุณ เอกธัช นาวิกบุตร',r:2,nk:'อ๊อก',ps:'Zone9'},
+{id:12,nm:'คุณ อารีย์ นิ่มกลาง',r:2,nk:'แพรวา',ps:'Zone10'},
+{id:13,nm:'คุณ ณฐกร ศุภรัตนพงศ์',r:3,nk:'หนึ่ง',ps:'Regional SOA'},
+{id:14,nm:'คุณ ณัฐวัฒน์ เดชโนนสังข์',r:3,nk:'ท๊อป',ps:'Zone11'},
+{id:15,nm:'คุณ พจนีย์ กลั่นเขตกิจ',r:3,nk:'อ้อ',ps:'Zone12'},
+{id:16,nm:'คุณ เสถียร ผลขาว',r:3,nk:'เสถียร',ps:'Zone13'},
+{id:17,nm:'คุณ รัตวัชร์ พงศ์วัจนาทิน',r:3,nk:'อาร์ต',ps:'Zone14'},
+{id:18,nm:'คุณ วรรณิภา บุญจริง',r:3,nk:'ติ๊ก',ps:'Zone15'},
+{id:19,nm:'คุณ บุษรา ไชยเสน',r:4,nk:'บุ๋ม',ps:'Zone16'},
+{id:20,nm:'คุณ พงศิกร รังษีพลาสวัสดิ์',r:4,nk:'ปอนด์',ps:'Zone17'}
+];
+var BK=[],NI=1,CE=null,CR='user',EID=null,DID=null,DDO=false,MO=false,MEI=null,CV=0,ST=null,LH='',DX={};
+
+/* ── SCREEN ───────────────────── */
+function scr(s){
+  var L=document.getElementById('SL'),N=document.getElementById('SN'),A=document.getElementById('SA');
+  L.style.display=s==='L'?'flex':'none';
+  N.style.display=s==='N'?'flex':'none';
+  A.style.display=s==='A'?'flex':'none';
+}
+
+/* ── FIREBASE ─────────────────── */
+function fbOK(){return typeof FBU==='string'&&FBU.indexOf('https://')===0;}
+function fbLoad(done){
+  if(!fbOK()){lsL();done();return;}
+  ssync('sy','กำลังโหลด...');
+  var fired=false;
+  var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},5000);
+  fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(d){if(fired)return;fired=true;clearTimeout(t);if(d&&d.BK){BK=d.BK;NI=d.NI||nxId();lsS();}else{BK=[];NI=1;}ssync('','พร้อมใช้งาน');done();})
+    .catch(function(){if(fired)return;fired=true;clearTimeout(t);lsL();ssync('se','ออฟไลน์');done();});
+}
+function fbSave(){
+  lsS();
+  var ts = Date.now();
+  // อัปเดต LH ทันทีหลังบันทึก เพื่อไม่ให้ fbSync ดึงข้อมูลตัวเองกลับมา
+  LH = ts+'|'+BK.map(function(b){return b.id;}).join(',')+'|dx:'+Object.keys(DX).sort().join(',');
+  if(!fbOK()){ssync('','บันทึก (Local)');return;}
+  ssync('sy','กำลังบันทึก...');
+  fetch(FBU+'/'+DBK+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({BK:BK,NI:NI,t:ts,DX:DX})})
+    .then(function(){ssync('','บันทึกแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);})
+    .catch(function(){ssync('se','บันทึกไม่สำเร็จ');});
+}
+function fbSync(){
+  if(!fbOK())return;
+  if(ST)clearInterval(ST);
+  ST=setInterval(function(){
+    fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.BK)return;
+        var h=(d.t||'')+'|'+d.BK.map(function(b){return b.id;}).join(',')+'|dx:'+(d.DX?Object.keys(d.DX).sort().join(','):'');
+        if(h===LH)return;
+        LH=h;
+        // merge deleted IDs จาก server
+        if(d.DX) Object.assign(DX,d.DX);
+        // กรองรายการที่ถูกลบออกเสมอ
+        BK=d.BK.filter(function(b){ return !DX[b.id]; });
+        NI=nxId();lsS();rV();
+        ssync('','อัปเดตแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+      }).catch(function(){});
+  },4000);
+}
+function fbStop(){if(ST){clearInterval(ST);ST=null;}}
+
+/* ── LOCAL STORAGE ─────────────── */
+function lsL(){try{var r=localStorage.getItem(DBK);if(r){var d=JSON.parse(r);BK=d.BK||[];NI=d.NI||nxId();DX=d.DX||{};}else{BK=[];NI=1;}}catch(e){BK=[];NI=1;}}
+function lsS(){try{localStorage.setItem(DBK,JSON.stringify({BK:BK,NI:NI,t:Date.now(),DX:DX}));}catch(e){}}
+function nxId(){return BK.length?Math.max.apply(null,BK.map(function(b){return b.id;}))+1:1;}
+function ssync(cls,txt){var b=document.getElementById('SBAR'),t=document.getElementById('STX');if(!b||!t)return;b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':'');t.textContent=txt;}
+
+/* ── BOOT ─────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  lsL();    /* load localStorage */
+  scr('N'); /* แสดง Login ทันที */
+});
+
+/* ── LOGIN/LOGOUT ─────────────── */
+function doLogin(){
+  var u=document.getElementById('LU').value.trim().toLowerCase();
+  var p=document.getElementById('LP').value;
+  var a=US[u],e=document.getElementById('LE');
+  if(!a||a.pw!==p){e.style.display='block';return;}
+  e.style.display='none';CR=a.role;scr('A');
+  document.getElementById('SAV').textContent=a.lbl;
+  document.getElementById('SNM').textContent=u==='admin'?'Administrator':'SOA User';
+  document.getElementById('SRO').textContent=a.disp;
+  var rb=document.getElementById('RB');rb.className='rb '+(CR==='admin'?'ra':'ru');rb.textContent=CR==='admin'?'Admin':'SOA';
+  var ia=CR==='admin';
+  document.getElementById('NAL').style.display=ia?'block':'none';
+  ['N2','N3','B2','B3'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
+  var sb=document.getElementById('SBAR');if(sb)sb.style.display='flex';
+  ssync('','พร้อมใช้งาน');
+  fbSync();
+  rEO('','DO',false);
+}
+function doLogout(){
+  fbStop();scr('N');
+  document.getElementById('LU').value='';document.getElementById('LP').value='';
+  document.getElementById('LE').style.display='none';
+  CE=null;document.getElementById('DV').value='';
+  var sb=document.getElementById('SBAR');if(sb)sb.style.display='none';
+  cSB();gv(0);
+}
+
+/* ── SIDEBAR ──────────────────── */
+function oSB(){var s=document.getElementById('SB'),o=document.getElementById('OV');s.classList.add('op');o.style.display='block';}
+function cSB(){document.getElementById('SB').classList.remove('op');document.getElementById('OV').style.display='none';}
+
+/* ── DROPDOWN ─────────────────── */
+function tDD(){DDO=!DDO;document.getElementById('DL').classList.toggle('op',DDO);if(DDO)setTimeout(function(){document.getElementById('DQ').focus();},80);}
+function tMDD(){MO=!MO;document.getElementById('MDL').classList.toggle('op',MO);if(MO)setTimeout(function(){document.getElementById('MDQ').focus();},80);}
+document.addEventListener('click',function(e){
+  var w=document.getElementById('DW');if(w&&!w.contains(e.target)){DDO=false;document.getElementById('DL').classList.remove('op');}
+  var m=document.getElementById('MDW');if(m&&!m.contains(e.target)){MO=false;document.getElementById('MDL').classList.remove('op');}
+});
+function fEmp(){rEO(document.getElementById('DQ').value.toLowerCase().trim(),'DO',false);}
+function fMEmp(){rEO(document.getElementById('MDQ').value.toLowerCase().trim(),'MDO',true);}
+function rEO(q,tid,isM){
+  var g={1:[],2:[],3:[],4:[]};
+  EM.forEach(function(e){if(!q||e.nm.toLowerCase().indexOf(q)>=0||e.nk.toLowerCase().indexOf(q)>=0)g[e.r].push(e);});
+  var h='';
+  [1,2,3,4].forEach(function(r){
+    if(!g[r].length)return;
+    h+='<div class="dgl">Regional '+r+'</div>';
+    g[r].forEach(function(e){h+='<div class="do" onclick="'+(isM?'pkM':'pkE')+'('+e.id+')"><div class="dn">'+e.nm+' ('+e.nk+')</div><div class="dp">'+e.ps+'</div></div>';});
+  });
+  var el=document.getElementById(tid);if(el)el.innerHTML=h||'<div class="de">ไม่พบชื่อ</div>';
+}
+function pkE(id){CE=EM.find(function(e){return e.id===id;});document.getElementById('DV').value=CE.nm+' ('+CE.nk+') — R'+CE.r;DDO=false;document.getElementById('DL').classList.remove('op');document.getElementById('DQ').value='';}
+function pkM(id){MEI=id;var e=EM.find(function(x){return x.id===id;});document.getElementById('MDV').value=e.nm+' ('+e.nk+') — R'+e.r;MO=false;document.getElementById('MDL').classList.remove('op');document.getElementById('MDQ').value='';}
+
+/* ── NIGHTS ───────────────────── */
+function nts(a,b){if(!a||!b)return 0;var d=(new Date(b)-new Date(a))/86400000;return d>0?Math.round(d):0;}
+function cN(){
+  var n=nts(document.getElementById('FCI').value,document.getElementById('FCO').value);
+  var el=document.getElementById('FN');
+  el.innerHTML=n>0?'<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2z"/></svg> <strong>'+n+' คืน</strong>':'<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h6V9l4 4-4 4v-4z"/></svg> เลือก Check-in/out';
+}
+function mCN(){
+  var n=nts(document.getElementById('MCI').value,document.getElementById('MCO').value);
+  document.getElementById('MN').innerHTML=n>0?'<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2z"/></svg> <strong>'+n+' คืน</strong>':'—';
+  var p=parseFloat(document.getElementById('MPR').value)||0;if(p>0&&n>0)document.getElementById('MTO').value=p*n;
+}
+function mAT(){var b=BK.find(function(x){return x.id===EID;});var n=nts(document.getElementById('MCI').value,document.getElementById('MCO').value)||(b?b.n:0);document.getElementById('MTO').value=(parseFloat(document.getElementById('MPR').value)||0)*n||'';}
+
+/* ── FORM ─────────────────────── */
+function clrF(){['FD','FB','FCI','FCO','FT'].forEach(function(id){document.getElementById(id).value='';});cN();}
+function subB(){
+  if(!CE){tt('กรุณาเลือกชื่อพนักงานก่อน','er');return;}
+  var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
+  if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
+  var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
+  BK.push({id:NI++,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()});
+  fbSave();tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
+}
+
+/* ── HELPERS ──────────────────── */
+function fD(d){if(!d)return'-';var dt=new Date(d+'T00:00:00');var m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return dt.getDate()+' '+m[dt.getMonth()]+' '+(dt.getFullYear()+543);}
+function fX(d){if(!d)return'';var dt=new Date(d+'T00:00:00');return('0'+dt.getDate()).slice(-2)+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+dt.getFullYear();}
+function ge(id){return EM.find(function(e){return e.id===id;});}
+function stB(s){var c={รอดำเนินการ:'sb sw',ยืนยันแล้ว:'sb so',เสร็จสิ้น:'sb sc',ยกเลิก:'sb sn2'}[s]||'sb sw';return '<span class="'+c+'">'+(s||'รอดำเนินการ')+'</span>';}
+
+/* ── RENDER MINE ──────────────── */
+function rM(){
+  if(!CE){document.getElementById('MST').innerHTML='<div style="color:var(--M);font-size:13px">กรุณาเลือกชื่อพนักงานก่อน</div>';document.getElementById('MTB').innerHTML='';document.getElementById('MCA').innerHTML='';return;}
+  var mb=BK.filter(function(b){return b.eid===CE.id;});
+  var tot=mb.reduce(function(a,b){return a+(b.tot||0);},0);
+  document.getElementById('MST').innerHTML='<div class="st"><div class="stn">'+mb.length+'</div><div class="stl">รายการทั้งหมด</div></div><div class="st"><div class="stn" style="color:#d97706">'+mb.filter(function(b){return b.st==='รอดำเนินการ';}).length+'</div><div class="stl">รอดำเนินการ</div></div><div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">ยอดรวม ฿</div></div>';
+  document.getElementById('MTB').innerHTML=mb.length?mb.map(function(b){return'<tr><td>'+fD(b.dt)+'</td><td>'+b.br+'</td><td>'+fD(b.ci)+'</td><td>'+fD(b.co)+'</td><td><strong>'+b.n+'</strong></td><td>'+stB(b.st)+'</td><td>'+(b.ht||'<span style="color:var(--M)">รอ Admin</span>')+'</td><td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td></tr>';}).join(''):'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--M)">ยังไม่มีรายการจอง</td></tr>';
+  document.getElementById('MCA').innerHTML=mb.length?mb.map(function(b){return'<div class="bc"><div class="bch"><div><div class="bcn">'+b.br+'</div><div class="bcp">'+fD(b.dt)+'</div></div>'+stB(b.st)+'</div><div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div><div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div><div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'รอ Admin')+'</span></div><div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div></div>';}).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ยังไม่มีรายการจอง</div>';
+}
+
+/* ── RENDER ADMIN ─────────────── */
+function clrR(){document.getElementById('FF').value='';document.getElementById('FT2').value='';rA();}
+function rA(){
+  var nF=(document.getElementById('FS')||{}).value?.toLowerCase()||'';
+  var sF=(document.getElementById('FST')||{}).value||'';
+  var fr=(document.getElementById('FF')||{}).value||'';
+  var to=(document.getElementById('FT2')||{}).value||'';
+  var d=BK.filter(function(b){var e=ge(b.eid)||{};return(!nF||((e.nm||'')+b.br).toLowerCase().indexOf(nF)>=0)&&(!sF||b.st===sF)&&(!fr||b.ci>=fr)&&(!to||b.co<=to);});
+  var tot=BK.reduce(function(a,b){return a+(b.tot||0);},0);
+  document.getElementById('AST').innerHTML='<div class="st"><div class="stn">'+BK.length+'</div><div class="stl">ทั้งหมด</div></div><div class="st"><div class="stn" style="color:#d97706">'+BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+'</div><div class="stl">รอดำเนินการ</div></div><div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">งบรวม ฿</div></div>';
+  document.getElementById('ATB').innerHTML=d.length?d.map(function(b){var e=ge(b.eid)||{};return'<tr><td><strong style="font-size:12px">'+(e.nm||'-')+'</strong><br><span style="font-size:10px;color:var(--M)">'+(e.ps||'')+'</span></td><td>R'+(e.r||'-')+'</td><td>'+b.br+'</td><td>'+fD(b.ci)+'</td><td>'+fD(b.co)+'</td><td><strong>'+b.n+'</strong></td><td>'+stB(b.st)+'</td><td>'+(b.ht||'-')+'</td><td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td><td><div style="display:flex;gap:5px"><button class="btn bo bs" onclick="opEd('+b.id+')" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้ไข</button><button class="btn bd bs" onclick="askD('+b.id+')" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button></div></td></tr>';}).join(''):'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
+  document.getElementById('ACA').innerHTML=d.length?d.map(function(b){var e=ge(b.eid)||{};return'<div class="bc"><div class="bch"><div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div><div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+stB(b.st)+'</div><div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div><div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div><div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div><div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div><div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'+(b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')+'<div class="bca"><button class="btn bo" onclick="opEd('+b.id+')" style="font-size:13px"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้ไข</button><button class="btn bd" onclick="askD('+b.id+')" style="font-size:13px"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button></div></div>';}).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
+}
+
+/* ── EDIT MODAL ───────────────── */
+function opEd(id){
+  EID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b.eid)||{};MEI=b.eid;
+  document.getElementById('MDV').value=e.nm?e.nm+' ('+e.nk+') — R'+e.r:'';
+  document.getElementById('MFD').value=b.dt||'';document.getElementById('MFB').value=b.br||'';
+  document.getElementById('MCI').value=b.ci||'';document.getElementById('MCO').value=b.co||'';
+  document.getElementById('MNT').value=b.nt||'';mCN();
+  document.getElementById('MST2').value=b.st||'รอดำเนินการ';document.getElementById('MHT').value=b.ht||'';
+  document.getElementById('MPR').value=b.pr||'';document.getElementById('MTO').value=b.tot||'';
+  document.getElementById('MRV').value=b.rv||'';
+  rEO('','MDO',true);
+  document.getElementById('ME').classList.add('op');document.body.style.overflow='hidden';
+}
+function cEd(){document.getElementById('ME').classList.remove('op');document.body.style.overflow='';MO=false;}
+function svEd(){
+  var b=BK.find(function(x){return x.id===EID;});
+  var ci=document.getElementById('MCI').value,co=document.getElementById('MCO').value,n=nts(ci,co)||b.n;
+  if(MEI)b.eid=MEI;
+  b.dt=document.getElementById('MFD').value||b.dt;b.br=document.getElementById('MFB').value||b.br;
+  b.ci=ci||b.ci;b.co=co||b.co;b.n=n;b.nt=document.getElementById('MNT').value;
+  b.st=document.getElementById('MST2').value;b.ht=document.getElementById('MHT').value;
+  b.pr=parseFloat(document.getElementById('MPR').value)||0;b.tot=parseFloat(document.getElementById('MTO').value)||0;
+  b.rv=document.getElementById('MRV').value;b.ua=Date.now();
+  cEd();fbSave();rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
+}
+function askD(id){
+  DID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b?b.eid:null)||{};
+  document.getElementById('CDM').innerHTML='<strong>'+(e.nm||'รายการนี้')+'</strong><br>'+(b?b.br:'')+' | '+(b?fD(b.ci):'')+'<br><br><span style="color:#dc2626;font-size:12px">ลบถาวร กู้คืนไม่ได้</span>';
+  document.getElementById('CD').classList.add('op');document.getElementById('ME').classList.remove('op');document.body.style.overflow='hidden';
+}
+function cConf(){document.getElementById('CD').classList.remove('op');document.body.style.overflow='';DID=null;}
+function doDel(){
+  if(!DID)return;
+  fbStop();                                              // หยุด sync ก่อน
+  DX[DID]=Date.now();                                    // mark ว่าลบแล้ว
+  BK=BK.filter(function(x){return x.id!==DID;});        // ลบออก
+  NI=nxId();
+  cConf();
+  fbSave();                                              // บันทึกทันที
+  rA(); rM(); rEx();
+  tt('ลบรายการเรียบร้อย','ok');
+  DID=null;
+  setTimeout(function(){ fbSync(); }, 2000);             // restart sync หลัง 2 วิ
+}
+
+/* ── EXPORT ───────────────────── */
+function bR(data){return data.map(function(b){var e=ge(b.eid)||{};return{'ชื่อพนักงาน':e.nm||'','Regional':e.r||'','ตำแหน่ง':e.ps||'','วันที่จอง':fX(b.dt),'สาขา':b.br,'Check-in':fX(b.ci),'Check-out':fX(b.co),'จำนวนคืน':b.n,'หมายเหตุ':b.nt||'','สถานะ':b.st||'รอดำเนินการ','ชื่อที่พัก':b.ht||'','ราคา/คืน (฿)':b.pr||'','ราคารวม (฿)':b.tot||'','รีวิวที่พัก':b.rv||''};});}
+function dlX(rows,fn){var ws=XLSX.utils.json_to_sheet(rows);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'ข้อมูลการจอง');XLSX.writeFile(wb,fn);}
+function exAll(){if(!BK.length){tt('ไม่มีข้อมูล','er');return;}dlX(bR(BK),'จองที่พัก_ทั้งหมด_'+fX(new Date().toISOString().slice(0,10))+'.xlsx');tt('ดาวน์โหลดเรียบร้อย ✓','ok');}
+function exPer(){if(!BK.length){tt('ไม่มีข้อมูล','er');return;}var s={};BK.forEach(function(b){var e=ge(b.eid)||{},k=e.nm||'?';if(!s[k])s[k]={nm:k,r:e.r||'',ps:e.ps||'',c:0,n:0,t:0};s[k].c++;s[k].n+=b.n||0;s[k].t+=b.tot||0;});dlX(Object.values(s).map(function(x){return{'ชื่อพนักงาน':x.nm,'Regional':x.r,'ตำแหน่ง':x.ps,'จำนวนรายการ':x.c,'รวมคืน':x.n,'ยอดรวม (฿)':x.t};}), 'จองที่พัก_รายบุคคล_'+fX(new Date().toISOString().slice(0,10))+'.xlsx');tt('ดาวน์โหลดเรียบร้อย ✓','ok');}
+function exPen(){var p=BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;});if(!p.length){tt('ไม่มีรายการรอดำเนินการ','er');return;}dlX(bR(p),'จองที่พัก_รอดำเนินการ_'+fX(new Date().toISOString().slice(0,10))+'.xlsx');tt('ดาวน์โหลด '+p.length+' รายการ ✓','ok');}
+function rEx(){var tb=document.getElementById('ETB');if(!tb)return;tb.innerHTML=BK.slice(0,8).map(function(b){var e=ge(b.eid)||{};return'<tr><td>'+(e.nm||'-')+'</td><td>R'+(e.r||'-')+'</td><td>'+fX(b.dt)+'</td><td>'+b.br+'</td><td>'+fX(b.ci)+'</td><td>'+fX(b.co)+'</td><td>'+b.n+'</td><td>'+stB(b.st)+'</td><td>'+(b.ht||'-')+'</td><td>'+(b.tot?b.tot.toLocaleString():'-')+'</td></tr>';}).join('');}
+
+/* ── NAV ──────────────────────── */
+var VN=[['จองที่พัก','กรอกรายละเอียดการเดินทางและที่พัก'],['รายการของฉัน','ดูสถานะการจองทั้งหมด'],['จัดการทั้งหมด','แก้ไข / ลบ / อัปเดตรายการ'],['Export ข้อมูล','ดาวน์โหลดเป็นไฟล์ Excel']];
+function gv(v){
+  [0,1,2,3].forEach(function(i){
+    var vl=document.getElementById('V'+i);if(vl)vl.classList.toggle('on',i===v);
+    var nl=document.getElementById('N'+i);if(nl)nl.classList.toggle('on',i===v);
+    var bl=document.getElementById('B'+i);if(bl)bl.classList.toggle('on',i===v);
+  });
+  CV=v;
+  document.getElementById('PT').textContent=VN[v][0];
+  document.getElementById('PS').textContent=VN[v][1];
+  if(v===1)rM();if(v===2)rA();if(v===3)rEx();
+}
+function rV(){if(CV===1)rM();else if(CV===2)rA();else if(CV===3)rEx();}
+
+/* ── TOAST ────────────────────── */
+function tt(msg,type){var t=document.getElementById('TT');t.textContent=msg;t.className='toast'+(type==='ok'?' tok':type==='er'?' ter':'');t.classList.add('sh');setTimeout(function(){t.classList.remove('sh');},3000);}
+
+/* init dropdown */
+rEO('','DO',false);
+</script>
+</body>
+</html>
