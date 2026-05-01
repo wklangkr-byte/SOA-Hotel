@@ -300,7 +300,7 @@ textarea{resize:vertical;min-height:70px}
         </div>
         <div class="brow">
           <button class="btn bo" onclick="clrF()">ล้างข้อมูล</button>
-          <button class="btn bp" onclick="subB()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง</button>
+          <button class="btn bp" id="SUBBTN" onclick="subB()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง</button>
         </div>
       </div>
 
@@ -411,7 +411,18 @@ textarea{resize:vertical;min-height:70px}
 /* =====================================================
    CONFIG — ใส่ Firebase databaseURL ตรงนี้
    ===================================================== */
-var FBU='https://create-2160b-default-rtdb.asia-southeast1.firebasedatabase.app/';
+var FBU='https://create-2160b-default-rtdb.asia-southeast1.firebasedatabase.app';
+/*
+ * ⚠️  Firebase Realtime Database Rules ต้องตั้งค่าเป็น:
+ * {
+ *   "rules": {
+ *     ".read": true,
+ *     ".write": true
+ *   }
+ * }
+ * ตั้งค่าที่: Firebase Console → Realtime Database → Rules
+ * (สำหรับ production ให้ใช้ Authentication แทน)
+ */
 /* ตัวอย่าง: 'https://hotel-booking-soa-default-rtdb.asia-southeast1.firebasedatabase.app' */
 /* ===================================================== */
 var DBK='hbv4';
@@ -451,7 +462,12 @@ function scr(s){
 }
 
 /* ── FIREBASE ─────────────────── */
-function fbOK(){return typeof FBU==='string'&&FBU.indexOf('https://')===0;}
+function fbOK(){
+  if(typeof FBU!=='string')return false;
+  if(FBU.indexOf('https://')<0)return false;
+  if(FBU.indexOf('firebasedatabase.app')<0)return false;
+  return true;
+}
 
 /* แก้ไข: เพิ่ม timeout เป็น 12 วิ รองรับ mobile network ช้า */
 function fbLoad(done){
@@ -459,22 +475,33 @@ function fbLoad(done){
   ssync('sy','กำลังโหลด...');
   var fired=false;
   var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},12000);
-  fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
-    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  var fbUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?nc='+Date.now();
+  fetch(fbUrl)
+    .then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    })
     .then(function(d){
       if(fired)return;fired=true;clearTimeout(t);
-      if(d&&d.BK){
-        BK=d.BK;
-        /* แก้ไข: merge DX จาก server ก่อน filter */
+      if(d&&d.BK&&Array.isArray(d.BK)&&d.BK.length>0){
         if(d.DX)Object.assign(DX,d.DX);
-        BK=BK.filter(function(b){return !DX[b.id];});
-        /* แก้ไข: ใช้ max(server NI, nxId()) ป้องกัน ID ซ้ำ */
+        BK=d.BK.filter(function(b){return !DX[b.id];});
         NI=Math.max(d.NI||1,nxId());
         lsS();
-      }else{BK=[];NI=1;}
+      }else{
+        /* Firebase ว่างเปล่า — ใช้ข้อมูล localStorage ถ้ามี */
+        if(!BK.length)lsL();
+        if(!BK.length){BK=[];NI=1;}
+      }
       ssync('','พร้อมใช้งาน');done();
     })
-    .catch(function(){if(fired)return;fired=true;clearTimeout(t);lsL();ssync('se','ออฟไลน์');done();});
+    .catch(function(err){
+      if(fired)return;fired=true;clearTimeout(t);
+      console.warn('fbLoad error:',err);
+      lsL(); /* fallback localStorage */
+      ssync('se','ออฟไลน์ — ใช้ข้อมูลในเครื่อง');
+      done();
+    });
 }
 
 /* แก้ไข: fbSave พร้อม retry 3 ครั้ง + save queue ป้องกัน concurrent write */
@@ -494,7 +521,9 @@ function _doFbSave(attempt){
   /* อัปเดต LH ทันที ป้องกัน fbSync ดึงกลับมา */
   LH=ts+'|'+BK.map(function(b){return b.id;}).join(',')+'|dx:'+Object.keys(DX).sort().join(',');
   ssync('sy','กำลังบันทึก...');
-  fetch(FBU+'/'+DBK+'.json',{
+  var saveUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json';
+  console.log('[fbSave] PUT to:',saveUrl,'records:',BK.length);
+  fetch(saveUrl,{
     method:'PUT',
     headers:{'Content-Type':'application/json'},
     body:payload
@@ -503,11 +532,11 @@ function _doFbSave(attempt){
     if(!r.ok)throw new Error('HTTP '+r.status);
     return r.json();
   })
-  .then(function(){
+  .then(function(result){
     SAVING=false;
+    console.log('[fbSave] Success ✓ records='+BK.length);
     ssync('','บันทึกแล้ว ✓');
     setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
-    /* ถ้ามี save ค้างอยู่ ให้ save ต่อ */
     if(SAVE_PENDING)_doFbSave(0);
   })
   .catch(function(err){
@@ -529,7 +558,8 @@ function fbSync(){
   if(ST)clearInterval(ST);
   ST=setInterval(function(){
     if(SAVING)return; /* แก้ไข: ไม่ sync ขณะกำลัง save ป้องกัน overwrite */
-    fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+    var syncUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?nc='+Date.now();
+    fetch(syncUrl)
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
       .then(function(d){
         if(!d||!d.BK)return;
@@ -572,8 +602,20 @@ function ssync(cls,txt){var b=document.getElementById('SBAR'),t=document.getElem
 
 /* ── BOOT ─────────────────────── */
 document.addEventListener('DOMContentLoaded', function() {
-  lsL();    /* load localStorage */
-  scr('N'); /* แสดง Login ทันที */
+  lsL();
+  scr('N');
+  /* ทดสอบ Firebase connection ทันทีตอน boot */
+  if(fbOK()){
+    var testUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?shallow=true&nc='+Date.now();
+    fetch(testUrl)
+      .then(function(r){
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        console.log('[Boot] Firebase reachable ✓');
+      })
+      .catch(function(e){
+        console.warn('[Boot] Firebase unreachable:',e.message);
+      });
+  }
 });
 
 /* ── LOGIN/LOGOUT ─────────────── */
@@ -582,7 +624,10 @@ function doLogin(){
   var p=document.getElementById('LP').value;
   var a=US[u],e=document.getElementById('LE');
   if(!a||a.pw!==p){e.style.display='block';return;}
-  e.style.display='none';CR=a.role;scr('A');
+  e.style.display='none';CR=a.role;
+  /* แสดง loading ขณะโหลดข้อมูลจาก Firebase */
+  scr('L');
+  document.getElementById('SLM').textContent='กำลังโหลดข้อมูล...';
   document.getElementById('SAV').textContent=a.lbl;
   document.getElementById('SNM').textContent=u==='admin'?'Administrator':'SOA User';
   document.getElementById('SRO').textContent=a.disp;
@@ -591,9 +636,14 @@ function doLogin(){
   document.getElementById('NAL').style.display=ia?'block':'none';
   ['N2','N3','B2','B3'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
   var sb=document.getElementById('SBAR');if(sb)sb.style.display='flex';
-  ssync('','พร้อมใช้งาน');
-  fbSync();
-  rEO('','DO',false);
+  /* โหลดข้อมูลจาก Firebase ก่อนเข้าแอป */
+  fbLoad(function(){
+    scr('A');
+    ssync('','พร้อมใช้งาน');
+    fbSync();
+    rEO('','DO',false);
+    rV();
+  });
 }
 function doLogout(){
   fbStop();scr('N');
@@ -654,11 +704,21 @@ function subB(){
   if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
   var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
   SUBMITTING=true;
+  /* ล็อคปุ่มชั่วคราว */
+  var btn=document.getElementById('SUBBTN');
+  if(btn){btn.disabled=true;btn.textContent='กำลังบันทึก...';}
   var newId=nxId();
   NI=newId+1;
-  BK.push({id:newId,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()});
-  fbSave();tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
-  setTimeout(function(){SUBMITTING=false;},2000);
+  var newRec={id:newId,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()};
+  BK.push(newRec);
+  console.log('[subB] New booking id='+newId+' total BK='+BK.length);
+  fbSave();
+  tt('ส่งคำขอจองเรียบร้อย ✓','ok');
+  clrF();
+  setTimeout(function(){
+    SUBMITTING=false;
+    if(btn){btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง';}
+  },2500);
 }
 
 /* ── HELPERS ──────────────────── */
@@ -714,6 +774,7 @@ function svEd(){
   b.st=document.getElementById('MST2').value;b.ht=document.getElementById('MHT').value;
   b.pr=parseFloat(document.getElementById('MPR').value)||0;b.tot=parseFloat(document.getElementById('MTO').value)||0;
   b.rv=document.getElementById('MRV').value;b.ua=Date.now();
+  console.log('[svEd] Saving edit for id='+EID+' total BK='+BK.length);
   cEd();fbSave();rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
 }
 function askD(id){
