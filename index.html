@@ -64,10 +64,6 @@ html,body{font-family:'Sarabun',sans-serif;background:var(--BG);color:var(--T);m
 .sbar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--M);padding:4px 10px;background:#f0fdf4;border-radius:20px;transition:all .3s}
 .sbar.sy{background:#eff6ff;color:#1a56db}
 .sbar.se{background:#fef2f2;color:#dc2626}
-.sbar.rt{background:#f0fdf4;color:#059669}
-.sbar.ok{background:#f0fdf4;color:#059669}
-.sbar.rt .sd{background:#059669;animation:rtpulse 1.5s ease-in-out infinite}
-@keyframes rtpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.7}}
 .sd{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
 .sbar.sy .sd{background:#1a56db;animation:bl .8s infinite}
 .sbar.se .sd{background:#dc2626}
@@ -304,7 +300,7 @@ textarea{resize:vertical;min-height:70px}
         </div>
         <div class="brow">
           <button class="btn bo" onclick="clrF()">ล้างข้อมูล</button>
-          <button class="btn bp" id="SUBBTN" onclick="subB()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง</button>
+          <button class="btn bp" onclick="subB()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง</button>
         </div>
       </div>
 
@@ -416,17 +412,6 @@ textarea{resize:vertical;min-height:70px}
    CONFIG — ใส่ Firebase databaseURL ตรงนี้
    ===================================================== */
 var FBU='https://hotelproject-d12bf-default-rtdb.asia-southeast1.firebasedatabase.app/';
-/*
- * ⚠️  Firebase Realtime Database Rules ต้องตั้งค่าเป็น:
- * {
- *   "rules": {
- *     ".read": true,
- *     ".write": true
- *   }
- * }
- * ตั้งค่าที่: Firebase Console → Realtime Database → Rules
- * (สำหรับ production ให้ใช้ Authentication แทน)
- */
 /* ตัวอย่าง: 'https://hotel-booking-soa-default-rtdb.asia-southeast1.firebasedatabase.app' */
 /* ===================================================== */
 var DBK='hbv4';
@@ -454,8 +439,6 @@ var EM=[
 {id:20,nm:'คุณ พงศิกร รังษีพลาสวัสดิ์',r:4,nk:'ปอนด์',ps:'Zone17'}
 ];
 var BK=[],NI=1,CE=null,CR='user',EID=null,DID=null,DDO=false,MO=false,MEI=null,CV=0,ST=null,LH='',DX={};
-/* ── แก้ไข: ป้องกัน double-submit และ save queue ── */
-var SAVING=false,SAVE_PENDING=false,SUBMITTING=false;
 
 /* ── SCREEN ───────────────────── */
 function scr(s){
@@ -466,244 +449,60 @@ function scr(s){
 }
 
 /* ── FIREBASE ─────────────────── */
-function fbOK(){
-  if(typeof FBU!=='string')return false;
-  if(FBU.indexOf('https://')<0)return false;
-  if(FBU.indexOf('firebasedatabase.app')<0)return false;
-  return true;
-}
-
-/* แก้ไข: เพิ่ม timeout เป็น 12 วิ รองรับ mobile network ช้า */
+function fbOK(){return typeof FBU==='string'&&FBU.indexOf('https://')===0;}
 function fbLoad(done){
   if(!fbOK()){lsL();done();return;}
   ssync('sy','กำลังโหลด...');
   var fired=false;
-  var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},12000);
-  var fbUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?nc='+Date.now();
-  fetch(fbUrl)
-    .then(function(r){
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      return r.json();
-    })
-    .then(function(d){
-      if(fired)return;fired=true;clearTimeout(t);
-      if(d&&d.BK&&Array.isArray(d.BK)){
-        /* FIX: Firebase คือ source of truth เสมอ */
-        if(d.DX)Object.assign(DX,d.DX);
-        /* filter รายการที่ถูกลบ (DX) ออก */
-        var filtered=d.BK.filter(function(b){return !DX[b.id];});
-        /* ตรวจว่า localStorage มีรายการที่ firebase ยังไม่มีไหม
-           (กรณีบันทึกแล้วยังส่งไม่สำเร็จ) */
-        var lsData=null;
-        try{var r=localStorage.getItem(DBK);if(r)lsData=JSON.parse(r);}catch(e){}
-        var lsPending=[];
-        if(lsData&&lsData.BK&&Array.isArray(lsData.BK)){
-          var fbIds={};
-          filtered.forEach(function(b){fbIds[b.id]=true;});
-          lsPending=lsData.BK.filter(function(b){
-            return !fbIds[b.id]&&!DX[b.id];
-          });
-          if(lsPending.length){
-            console.log('[fbLoad] found',lsPending.length,'pending local records');
-          }
-        }
-        BK=filtered.concat(lsPending);
-        NI=Math.max(d.NI||1,nxId());
-        lsS();
-        /* ถ้ามี pending records → upload ขึ้น Firebase ทันที */
-        if(lsPending.length){
-          setTimeout(function(){fbSave();},1000);
-        }
-      }else{
-        /* Firebase ว่างเปล่า (ยังไม่เคยบันทึก) — ลอง localStorage */
-        lsL();
-        if(!BK.length){BK=[];NI=1;}
-      }
-      ssync('','พร้อมใช้งาน');done();
-    })
-    .catch(function(err){
-      if(fired)return;fired=true;clearTimeout(t);
-      console.warn('fbLoad error:',err);
-      lsL(); /* fallback localStorage */
-      ssync('se','ออฟไลน์ — ใช้ข้อมูลในเครื่อง');
-      done();
-    });
+  var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},5000);
+  fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(d){if(fired)return;fired=true;clearTimeout(t);if(d&&d.BK){BK=d.BK;NI=d.NI||nxId();lsS();}else{BK=[];NI=1;}ssync('','พร้อมใช้งาน');done();})
+    .catch(function(){if(fired)return;fired=true;clearTimeout(t);lsL();ssync('se','ออฟไลน์');done();});
 }
-
-/* ═══════════════════════════════════════════════════════════
-   FIREBASE SAVE + REALTIME SYNC
-   - fbSave  : PUT ข้อมูลขึ้น Firebase + retry 3 ครั้ง
-   - fbStartRT: เริ่ม polling ทุก 2 วิ — ทุกอุปกรณ์เห็นเหมือนกัน
-   ═══════════════════════════════════════════════════════════ */
-
-/* ── fbSave ──────────────────────────────────────────────── */
 function fbSave(){
-  lsS(); /* localStorage ก่อนเสมอ */
-  if(!fbOK()){ssync('','บันทึก (Local เท่านั้น)');return;}
-  if(SAVING){SAVE_PENDING=true;return;}
-  _doFbSave(0);
-}
-
-function _doFbSave(attempt){
-  SAVING=true; SAVE_PENDING=false;
-  var ts=Date.now();
-  NI=nxId();
-  var snap={BK:BK.slice(),NI:NI,t:ts,DX:JSON.parse(JSON.stringify(DX))};
-  var url=FBU.replace(/\/+$/,'')+'/'+DBK+'.json';
-  ssync('sy','กำลังบันทึก...');
-  console.log('[Save] PUT',url,'rows:',snap.BK.length,'try:',attempt);
-  fetch(url,{
-    method:'PUT',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(snap)
-  })
-  .then(function(r){
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    return r.json();
-  })
-  .then(function(){
-    SAVING=false;
-    lsS();
-    console.log('[Save] OK rows='+BK.length);
-    ssync('ok','บันทึกแล้ว ✓');
-    setTimeout(function(){ssync('rt','⚡ Realtime');},1500);
-    if(SAVE_PENDING)_doFbSave(0);
-  })
-  .catch(function(err){
-    console.warn('[Save] fail attempt='+attempt,err.message);
-    if(attempt<3){
-      ssync('sy','กำลังลองใหม่ ('+( attempt+1)+'/3)...');
-      setTimeout(function(){_doFbSave(attempt+1);},[2000,4000,8000][attempt]);
-    }else{
-      SAVING=false; LH='';
-      ssync('se','บันทึกไม่สำเร็จ');
-      tt('⚠️ บันทึกไม่สำเร็จ ข้อมูลในเครื่องยังอยู่','er');
-    }
-  });
-}
-
-/* ── Realtime Sync (Polling) ─────────────────────────────── */
-var POLL_IV=null;   /* interval handle */
-var POLL_BUSY=false;/* ป้องกัน concurrent poll */
-
-/* ฟังก์ชันกลาง: รับ data จาก Firebase แล้ว update UI */
-function applyData(d){
-  if(!d||!d.BK||!Array.isArray(d.BK))return;
-
-  /* สร้าง signature รวม content ทุก field สำคัญ */
-  function makeSig(arr,dx){
-    var s=arr.map(function(b){
-      return [b.id,b.st||'',b.ht||'',b.tot||0,b.pr||0,
-              b.rv||'',b.br||'',b.ci||'',b.co||'',
-              b.ua||b.ca||0].join('|');
-    }).sort().join(';');
-    return s+'~dx:'+Object.keys(dx||{}).sort().join(',');
-  }
-
-  var svrSig=makeSig(d.BK,d.DX||{});
-  var locSig=makeSig(BK,DX);
-  if(svrSig===locSig)return; /* ข้อมูลเหมือนกัน ข้ามได้ */
-
-  /* merge deleted list */
-  if(d.DX)Object.assign(DX,d.DX);
-
-  /* หา record ที่อยู่ใน local แต่ยังไม่ถึง server */
-  var svrIds={};
-  d.BK.forEach(function(b){svrIds[b.id]=true;});
-  var pending=BK.filter(function(b){return !svrIds[b.id]&&!DX[b.id];});
-
-  /* ใช้ server เป็น source of truth */
-  BK=d.BK.filter(function(b){return !DX[b.id];});
-
-  if(pending.length){
-    BK=BK.concat(pending);
-    NI=nxId();
-    console.log('[Sync] pending='+pending.length+' uploading...');
-    if(!SAVING){LH='';setTimeout(function(){fbSave();},400);}
-  }else{
-    NI=Math.max(d.NI||1,nxId());
-  }
-
   lsS();
-  rV(); /* ← อัปเดต UI ทันที ทุก user เห็นพร้อมกัน */
-  console.log('[Sync] updated BK='+BK.length);
-  ssync('rt','⚡ Realtime');
+  var ts = Date.now();
+  // อัปเดต LH ทันทีหลังบันทึก เพื่อไม่ให้ fbSync ดึงข้อมูลตัวเองกลับมา
+  LH = ts+'|'+BK.map(function(b){return b.id;}).join(',')+'|dx:'+Object.keys(DX).sort().join(',');
+  if(!fbOK()){ssync('','บันทึก (Local)');return;}
+  ssync('sy','กำลังบันทึก...');
+  fetch(FBU+'/'+DBK+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({BK:BK,NI:NI,t:ts,DX:DX})})
+    .then(function(){ssync('','บันทึกแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);})
+    .catch(function(){ssync('se','บันทึกไม่สำเร็จ');});
 }
-
-function doPoll(){
-  if(POLL_BUSY)return;
-  POLL_BUSY=true;
-  var url=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?nc='+Date.now();
-  fetch(url)
-    .then(function(r){
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      return r.json();
-    })
-    .then(function(d){
-      POLL_BUSY=false;
-      applyData(d);
-    })
-    .catch(function(e){
-      POLL_BUSY=false;
-      console.warn('[Poll] '+e.message);
-      ssync('se','เชื่อมต่อขาด...');
-      setTimeout(function(){ssync('rt','⚡ Realtime');},3000);
-    });
-}
-
-function fbStartRT(){
+function fbSync(){
   if(!fbOK())return;
-  fbStop();
-  /* poll ทันที 1 ครั้ง แล้ว interval ทุก 2 วิ */
-  doPoll();
-  POLL_IV=setInterval(doPoll,2000);
-  ssync('rt','⚡ Realtime');
-  console.log('[RT] polling started 2s interval');
+  if(ST)clearInterval(ST);
+  ST=setInterval(function(){
+    fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.BK)return;
+        var h=(d.t||'')+'|'+d.BK.map(function(b){return b.id;}).join(',')+'|dx:'+(d.DX?Object.keys(d.DX).sort().join(','):'');
+        if(h===LH)return;
+        LH=h;
+        // merge deleted IDs จาก server
+        if(d.DX) Object.assign(DX,d.DX);
+        // กรองรายการที่ถูกลบออกเสมอ
+        BK=d.BK.filter(function(b){ return !DX[b.id]; });
+        NI=nxId();lsS();rV();
+        ssync('','อัปเดตแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+      }).catch(function(){});
+  },4000);
 }
-
-function fbStop(){
-  if(POLL_IV){clearInterval(POLL_IV);POLL_IV=null;}
-  POLL_BUSY=false;
-  SAVING=false; SAVE_PENDING=false;
-}
-
-
+function fbStop(){if(ST){clearInterval(ST);ST=null;}}
 
 /* ── LOCAL STORAGE ─────────────── */
 function lsL(){try{var r=localStorage.getItem(DBK);if(r){var d=JSON.parse(r);BK=d.BK||[];NI=d.NI||nxId();DX=d.DX||{};}else{BK=[];NI=1;}}catch(e){BK=[];NI=1;}}
 function lsS(){try{localStorage.setItem(DBK,JSON.stringify({BK:BK,NI:NI,t:Date.now(),DX:DX}));}catch(e){}}
-/* แก้ไข: nxId ใช้ timestamp-based ID เพื่อไม่ให้ซ้ำข้ามอุปกรณ์ */
-function nxId(){
-  if(!BK.length)return 1;
-  var maxId=Math.max.apply(null,BK.map(function(b){return b.id;}));
-  return maxId+1;
-}
-function ssync(cls,txt){
-  var b=document.getElementById('SBAR'),t=document.getElementById('STX');
-  if(!b||!t)return;
-  b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':cls==='rt'?' rt':cls==='ok'?' ok':'');
-  t.textContent=txt;
-}
+function nxId(){return BK.length?Math.max.apply(null,BK.map(function(b){return b.id;}))+1:1;}
+function ssync(cls,txt){var b=document.getElementById('SBAR'),t=document.getElementById('STX');if(!b||!t)return;b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':'');t.textContent=txt;}
 
 /* ── BOOT ─────────────────────── */
 document.addEventListener('DOMContentLoaded', function() {
-  lsL();
-  /* FIX: filter DX หลัง load localStorage ป้องกันรายการที่ลบแล้วกลับมา */
-  if(Object.keys(DX).length){
-    BK=BK.filter(function(b){return !DX[b.id];});
-  }
-  scr('N');
-  if(fbOK()){
-    var testUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?shallow=true&nc='+Date.now();
-    fetch(testUrl)
-      .then(function(r){
-        if(!r.ok)throw new Error('HTTP '+r.status);
-        console.log('[Boot] Firebase reachable ✓');
-      })
-      .catch(function(e){
-        console.warn('[Boot] Firebase unreachable:',e.message);
-      });
-  }
+  lsL();    /* load localStorage */
+  scr('N'); /* แสดง Login ทันที */
 });
 
 /* ── LOGIN/LOGOUT ─────────────── */
@@ -712,10 +511,7 @@ function doLogin(){
   var p=document.getElementById('LP').value;
   var a=US[u],e=document.getElementById('LE');
   if(!a||a.pw!==p){e.style.display='block';return;}
-  e.style.display='none';CR=a.role;
-  /* แสดง loading ขณะโหลดข้อมูลจาก Firebase */
-  scr('L');
-  document.getElementById('SLM').textContent='กำลังโหลดข้อมูล...';
+  e.style.display='none';CR=a.role;scr('A');
   document.getElementById('SAV').textContent=a.lbl;
   document.getElementById('SNM').textContent=u==='admin'?'Administrator':'SOA User';
   document.getElementById('SRO').textContent=a.disp;
@@ -724,24 +520,15 @@ function doLogin(){
   document.getElementById('NAL').style.display=ia?'block':'none';
   ['N2','N3','B2','B3'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
   var sb=document.getElementById('SBAR');if(sb)sb.style.display='flex';
-  /* โหลดข้อมูลจาก Firebase ก่อนเข้าแอป */
-  fbLoad(function(){
-    scr('A');
-    ssync('rt','⚡ Realtime');
-    fbStartRT();
-    rEO('','DO',false);
-    rV();
-  });
+  ssync('','พร้อมใช้งาน');
+  fbSync();
+  rEO('','DO',false);
 }
 function doLogout(){
-  fbStop();
-  BK=[];NI=1;DX={};LH='';
-  CE=null;CR='user';EID=null;DID=null;
-  SAVING=false;SAVE_PENDING=false;SUBMITTING=false;
-  scr('N');
+  fbStop();scr('N');
   document.getElementById('LU').value='';document.getElementById('LP').value='';
   document.getElementById('LE').style.display='none';
-  document.getElementById('DV').value='';
+  CE=null;document.getElementById('DV').value='';
   var sb=document.getElementById('SBAR');if(sb)sb.style.display='none';
   cSB();gv(0);
 }
@@ -790,28 +577,12 @@ function mAT(){var b=BK.find(function(x){return x.id===EID;});var n=nts(document
 /* ── FORM ─────────────────────── */
 function clrF(){['FD','FB','FCI','FCO','FT'].forEach(function(id){document.getElementById(id).value='';});cN();}
 function subB(){
-  if(SUBMITTING){tt('กำลังบันทึก กรุณารอสักครู่...','');return;}
   if(!CE){tt('กรุณาเลือกชื่อพนักงานก่อน','er');return;}
   var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
   if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
   var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
-  SUBMITTING=true;
-  /* ล็อคปุ่มชั่วคราว */
-  var btn=document.getElementById('SUBBTN');
-  if(btn){btn.disabled=true;btn.textContent='กำลังบันทึก...';}
-  var newId=nxId();
-  NI=newId+1;
-  var newRec={id:newId,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()};
-  BK.push(newRec);
-  console.log('[subB] New booking id='+newId+' total BK='+BK.length);
-  LH='';
-  fbSave();
-  tt('ส่งคำขอจองเรียบร้อย ✓','ok');
-  clrF();
-  setTimeout(function(){
-    SUBMITTING=false;
-    if(btn){btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>ส่งคำขอจอง';}
-  },2500);
+  BK.push({id:NI++,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()});
+  fbSave();tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
 }
 
 /* ── HELPERS ──────────────────── */
@@ -867,10 +638,7 @@ function svEd(){
   b.st=document.getElementById('MST2').value;b.ht=document.getElementById('MHT').value;
   b.pr=parseFloat(document.getElementById('MPR').value)||0;b.tot=parseFloat(document.getElementById('MTO').value)||0;
   b.rv=document.getElementById('MRV').value;b.ua=Date.now();
-  console.log('[svEd] Saving edit for id='+EID+' total BK='+BK.length);
-  /* FIX: reset LH เพื่อให้ fbSync รู้ว่ามีการแก้ไข */
-  LH='';
-  cEd();fbSave();rA();rM();rEx();tt('บันทึกเรียบร้อย ✓','ok');
+  cEd();fbSave();rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
 }
 function askD(id){
   DID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b?b.eid:null)||{};
@@ -880,19 +648,16 @@ function askD(id){
 function cConf(){document.getElementById('CD').classList.remove('op');document.body.style.overflow='';DID=null;}
 function doDel(){
   if(!DID)return;
-  fbStop();
-  var delId=DID;
-  DX[delId]=Date.now();
-  BK=BK.filter(function(x){return x.id!==delId;});
+  fbStop();                                              // หยุด sync ก่อน
+  DX[DID]=Date.now();                                    // mark ว่าลบแล้ว
+  BK=BK.filter(function(x){return x.id!==DID;});        // ลบออก
   NI=nxId();
-  lsS();
   cConf();
-  DID=null;
-  fbSave();
+  fbSave();                                              // บันทึกทันที
   rA(); rM(); rEx();
   tt('ลบรายการเรียบร้อย','ok');
-  /* restart polling หลัง delete */
-  setTimeout(function(){fbStartRT();},1000);
+  DID=null;
+  setTimeout(function(){ fbSync(); }, 2000);             // restart sync หลัง 2 วิ
 }
 
 /* ── EXPORT ───────────────────── */
