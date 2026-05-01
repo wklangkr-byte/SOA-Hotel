@@ -205,7 +205,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 /* ── MODAL ────────────────────────────────────────────────────── */
 .mb{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.5);z-index:500;-webkit-align-items:flex-end;align-items:flex-end;-webkit-justify-content:center;justify-content:center}
-.mb.op{display:-webkit-flex;display:flex}
+.mb.op,.cb.op{display:-webkit-flex!important;display:flex!important;visibility:visible!important}
 .mo{background:white;border-radius:20px 20px 0 0;width:100%;max-width:560px;overflow:hidden;-webkit-box-shadow:0 -8px 40px rgba(0,0,0,.2);box-shadow:0 -8px 40px rgba(0,0,0,.2);max-height:92vh;max-height:92dvh;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
 .mh2{width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:10px auto 0}
 .mh{padding:14px 18px;border-bottom:1px solid var(--BD);display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:space-between;justify-content:space-between;-webkit-flex-shrink:0;flex-shrink:0}
@@ -218,7 +218,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 /* ── CONFIRM DIALOG ───────────────────────────────────────────── */
 .cb{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.55);z-index:600;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;padding:16px}
-.cb.op{display:-webkit-flex;display:flex}
 .cbx{background:white;border-radius:18px;width:100%;max-width:340px;padding:26px 20px;text-align:center;-webkit-box-shadow:0 20px 60px rgba(0,0,0,.25);box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .cbi{width:54px;height:54px;border-radius:50%;background:#fee2e2;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;margin:0 auto 14px}
 .cbi svg{width:28px;height:28px;fill:#dc2626}
@@ -448,7 +447,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
     <div class="mf">
-      <button class="btn bd bs" onclick="askD(EID)" style="-webkit-flex:0 0 auto;flex:0 0 auto;touch-action:manipulation">🗑 ลบ</button>
+      <button class="btn bd bs" onclick="if(EID!==null&&EID!==undefined)askD(EID)" style="-webkit-flex:0 0 auto;flex:0 0 auto;touch-action:manipulation">🗑 ลบ</button>
       <div style="-webkit-flex:1;flex:1"></div>
       <button class="btn bo bs" onclick="cEd()" style="touch-action:manipulation">ยกเลิก</button>
       <button class="btn bp bs" onclick="svEd()" style="touch-action:manipulation"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>บันทึก</button>
@@ -668,6 +667,12 @@ function fbAddRecord(rec){
 
 /* ── อัปเดต record ──────────────────────────────────────────────────────── */
 function fbUpdateRecord(rec){
+  /* guard: ถ้าไม่มี _uid จะสร้าง key ใหม่ใน Firebase → เกิด duplicate */
+  if(!rec._uid){
+    console.error('fbUpdateRecord: rec._uid missing, abort');
+    lsS();
+    return;
+  }
   lsS();
   var patch={};
   patch['records/'+rec._uid]=rec;
@@ -680,8 +685,8 @@ function fbUpdateRecord(rec){
     },
     function(){
       /* อัปเดต queue — ถ้ามี uid นี้แล้วให้แทนที่ */
-      var idx=OQ.findIndex(function(q){return q.rec&&q.rec._uid===rec._uid;});
-      if(idx>=0)OQ[idx]={op:'update',rec:rec};
+      var qi=OQ.findIndex(function(q){return q.rec&&q.rec._uid===rec._uid;});
+      if(qi>=0)OQ[qi]={op:'update',rec:rec};
       else OQ.push({op:'update',rec:rec});
       saveQueue();
       ssync('se','ออฟไลน์ — ข้อมูลรอส่ง ('+OQ.length+')');
@@ -787,8 +792,8 @@ function startPolling(interval){
       .then(function(d){
         if(!d)return;
         var fresh=d.records?parseRecords(d):(d.BK?d.BK.filter(function(b){return !b._del;}):[]);
-        /* เปรียบเทียบ hash — ถ้าไม่เปลี่ยนก็ไม่ต้อง render */
-        var h=fresh.length+'|'+(fresh[fresh.length-1]||{})._uid;
+        /* hash รวม ua (updated_at) เพื่อตรวจจับการอัปเดตสถานะ */
+        var h=fresh.length+'|'+fresh.map(function(b){return String(b._uid||b.id)+(b.ua||b.ca||0);}).join(',');
         if(h===LH)return;
         LH=h;
         BK=mergeWithLocal(fresh);
@@ -828,24 +833,32 @@ function fbSync(){
     ES.addEventListener('put',function(e){
       try{
         sseOK=true; clearTimeout(sseCheck);
-        /* ถ้า SSE ทำงานได้ → ลด polling ลงเหลือ 15 วิ (ประหยัด battery) */
         startPolling(15000);
         var msg=JSON.parse(e.data);
         if(!msg)return;
         var d=msg.data;
         if(msg.path==='/'&&d){
           var fresh=d.records?parseRecords(d):(d.BK?d.BK.filter(function(b){return !b._del;}):[]);
+          fresh=dedupBK(fresh);
           BK=mergeWithLocal(fresh);
           NI=nxId(); lsS();
           if(!IS_SAVING){rV(); ssync('','🔄 Real-time');}
           setTimeout(function(){ssync('','พร้อมใช้งาน');},1500);
         } else if(msg.path&&msg.path.indexOf('/records/')===0&&d){
           if(!d._del){
-            var ex=BK.findIndex(function(b){return b._uid===d._uid;});
+            var ex=-1;
+            for(var i=0;i<BK.length;i++){
+              if(String(BK[i]._uid)===String(d._uid)||String(BK[i].id)===String(d._uid)){
+                ex=i; break;
+              }
+            }
             if(ex>=0)BK[ex]=d; else BK.push(d);
           } else {
-            BK=BK.filter(function(b){return b._uid!==d._uid;});
+            BK=BK.filter(function(b){
+              return String(b._uid)!==String(d._uid)&&String(b.id)!==String(d._uid);
+            });
           }
+          BK=dedupBK(BK);
           BK.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
           NI=nxId(); lsS();
           if(!IS_SAVING){rV(); ssync('','🔄 อัปเดตแล้ว');}
@@ -861,16 +874,31 @@ function fbSync(){
         sseOK=true;
         var msg=JSON.parse(e.data);
         if(!msg||!msg.data)return;
-        Object.keys(msg.data).forEach(function(key){
-          var rec=msg.data[key];
+        var changed=msg.data;
+        Object.keys(changed).forEach(function(key){
+          var rec=changed[key];
           if(!rec)return;
           if(rec._del){
-            BK=BK.filter(function(b){return b._uid!==key;});
+            /* ลบ: กรองออกทั้ง _uid และ id */
+            BK=BK.filter(function(b){
+              return String(b._uid)!==String(key)&&String(b.id)!==String(key);
+            });
           } else {
-            var idx=BK.findIndex(function(b){return b._uid===key;});
-            if(idx>=0)BK[idx]=rec; else BK.push(rec);
+            /* แก้ไข: ค้นหาด้วย _uid หรือ id แล้ว replace in-place */
+            var found=false;
+            for(var i=0;i<BK.length;i++){
+              if(String(BK[i]._uid)===String(key)||String(BK[i].id)===String(key)){
+                BK[i]=rec; /* replace ไม่ push */
+                found=true;
+                break;
+              }
+            }
+            /* เพิ่งสร้างใหม่จริงๆ (ไม่เจอเดิม) ค่อย push */
+            if(!found)BK.push(rec);
           }
         });
+        /* dedup: ถ้ามี _uid ซ้ำ เก็บแค่ตัวล่าสุด */
+        BK=dedupBK(BK);
         BK.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
         NI=nxId(); lsS();
         if(!IS_SAVING){rV(); ssync('','🔄 อัปเดตแล้ว');}
@@ -891,14 +919,42 @@ function fbSync(){
   }catch(err){ /* SSE สร้างไม่ได้ — polling ทำงานแทนอยู่แล้ว */ }
 }
 
+/* ── กำจัด record ซ้ำใน BK[] — ถ้า _uid เดียวกัน เก็บตัวที่ ua ล่าสุด ── */
+function dedupBK(arr){
+  var seen={};
+  var result=[];
+  for(var i=0;i<arr.length;i++){
+    var b=arr[i];
+    var key=String(b._uid||b.id||i);
+    if(!seen[key]){
+      seen[key]=true;
+      result.push(b);
+    } else {
+      /* มีซ้ำ — เก็บตัวที่อัปเดตล่าสุด */
+      for(var j=0;j<result.length;j++){
+        if(String(result[j]._uid||result[j].id)===key){
+          if((b.ua||b.ca||0)>(result[j].ua||result[j].ca||0)){
+            result[j]=b; /* แทนที่ด้วยตัวใหม่กว่า */
+          }
+          break;
+        }
+      }
+    }
+  }
+  return result;
+}
+
 /* ── Merge local pending กับ server data ────────────────────────────────── */
 function mergeWithLocal(serverBK){
   var pendingUids=OQ.map(function(q){return q.rec?q.rec._uid:q.uid;}).filter(Boolean);
   var merged=serverBK.slice();
   pendingUids.forEach(function(puid){
-    var local=BK.find(function(b){return b._uid===puid;});
-    if(local&&!merged.find(function(b){return b._uid===puid;}))merged.push(local);
+    var local=BK.find(function(b){return String(b._uid)===String(puid);});
+    if(local&&!merged.find(function(b){return String(b._uid)===String(puid);})){
+      merged.push(local);
+    }
   });
+  merged=dedupBK(merged); /* กำจัด duplicate ก่อน sort */
   return merged.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
 }
 
@@ -1005,7 +1061,7 @@ function mCN(){
   document.getElementById('MN').innerHTML=n>0?'<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2z"/></svg> <strong>'+n+' คืน</strong>':'—';
   var p=parseFloat(document.getElementById('MPR').value)||0;if(p>0&&n>0)document.getElementById('MTO').value=p*n;
 }
-function mAT(){var b=BK.find(function(x){return x.id===EID;});var n=nts(document.getElementById('MCI').value,document.getElementById('MCO').value)||(b?b.n:0);document.getElementById('MTO').value=(parseFloat(document.getElementById('MPR').value)||0)*n||'';}
+function mAT(){var b=findRec(EID);var n=nts(document.getElementById('MCI').value,document.getElementById('MCO').value)||(b?b.n:0);document.getElementById('MTO').value=(parseFloat(document.getElementById('MPR').value)||0)*n||'';}
 
 /* ── FORM ─────────────────────── */
 function clrF(){['FD','FB','FCI','FCO','FT'].forEach(function(id){document.getElementById(id).value='';});cN();}
@@ -1014,18 +1070,18 @@ function subB(){
   var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
   if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
   var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
-  /* สร้าง record ใหม่ด้วย uid ที่ไม่ซ้ำกันแน่นอน */
+  /* ใช้ _uid เดียวกันเป็นทั้ง _uid และ id เพื่อให้ค้นหาได้ทั้งสองแบบ */
+  var newUID=uid();
   var newRec={
-    _uid: uid(),          /* Unique ID — ไม่ซ้ำแม้บันทึกพร้อมกันหลายอุปกรณ์ */
-    id:   uid(),          /* compat กับ id เดิม */
+    _uid:newUID, id:newUID,
     eid:CE.id, dt:d, br:b, ci:ci, co:co, n:n,
     nt:document.getElementById('FT').value,
     st:'รอดำเนินการ', ht:'', pr:0, tot:0, rv:'',
-    ca:Date.now()         /* created_at timestamp */
+    ca:Date.now()
   };
   BK.push(newRec);
   NI=nxId();
-  fbAddRecord(newRec); /* Atomic PATCH — ไม่กระทบ record อื่น */
+  fbAddRecord(newRec);
   tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
 }
 
@@ -1045,105 +1101,218 @@ function rM(){
   document.getElementById('MCA').innerHTML=mb.length?mb.map(function(b){return'<div class="bc"><div class="bch"><div><div class="bcn">'+b.br+'</div><div class="bcp">'+fD(b.dt)+'</div></div>'+stB(b.st)+'</div><div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div><div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div><div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'รอ Admin')+'</span></div><div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div></div>';}).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ยังไม่มีรายการจอง</div>';
 }
 
-/* ── RENDER ADMIN ─────────────── */
-function clrR(){document.getElementById('FF').value='';document.getElementById('FT2').value='';rA();}
+/* ══════════════════════════════════════════════════════════════════
+   RENDER ADMIN — ใช้ data-index แทน onclick string เพื่อความปลอดภัย
+   ══════════════════════════════════════════════════════════════════ */
+function clrR(){
+  document.getElementById('FF').value='';
+  document.getElementById('FT2').value='';
+  rA();
+}
+
 function rA(){
   var nF=((document.getElementById('FS')||{}).value||'').toLowerCase();
   var sF=(document.getElementById('FST')||{}).value||'';
   var fr=(document.getElementById('FF')||{}).value||'';
   var to=(document.getElementById('FT2')||{}).value||'';
-  var d=BK.filter(function(b){var e=ge(b.eid)||{};return(!nF||((e.nm||'')+b.br).toLowerCase().indexOf(nF)>=0)&&(!sF||b.st===sF)&&(!fr||b.ci>=fr)&&(!to||b.co<=to);});
+
+  var d=BK.filter(function(b){
+    var e=ge(b.eid)||{};
+    return (!nF||((e.nm||'')+b.br).toLowerCase().indexOf(nF)>=0)
+        && (!sF||b.st===sF)
+        && (!fr||b.ci>=fr)
+        && (!to||b.co<=to);
+  });
+
   var tot=BK.reduce(function(a,b){return a+(b.tot||0);},0);
-  document.getElementById('AST').innerHTML='<div class="st"><div class="stn">'+BK.length+'</div><div class="stl">ทั้งหมด</div></div><div class="st"><div class="stn" style="color:#d97706">'+BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+'</div><div class="stl">รอดำเนินการ</div></div><div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">งบรวม ฿</div></div>';
-  /* ใช้ _uid เป็น key — ทำงานถูกต้องทั้ง record เก่าและใหม่ */
-  document.getElementById('ATB').innerHTML=d.length?d.map(function(b){
-    var e=ge(b.eid)||{};
-    var k=JSON.stringify(b._uid||b.id); /* JSON.stringify เพื่อให้ได้ quoted string ที่ปลอดภัย */
-    return'<tr>'
-      +'<td><strong style="font-size:12px">'+(e.nm||'-')+'</strong><br><span style="font-size:10px;color:var(--M)">'+(e.ps||'')+'</span></td>'
-      +'<td>R'+(e.r||'-')+'</td>'
-      +'<td>'+b.br+'</td>'
-      +'<td>'+fD(b.ci)+'</td>'
-      +'<td>'+fD(b.co)+'</td>'
-      +'<td><strong>'+b.n+'</strong></td>'
-      +'<td>'+stB(b.st)+'</td>'
-      +'<td>'+(b.ht||'-')+'</td>'
-      +'<td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td>'
-      +'<td><div style="display:-webkit-flex;display:flex;gap:5px">'
-        +'<button class="btn bo bs" onclick="opEd('+k+')" style="font-size:11px;touch-action:manipulation">✏️ แก้ไข</button>'
-        +'<button class="btn bd bs" onclick="askD('+k+')" style="font-size:11px;touch-action:manipulation">🗑 ลบ</button>'
-      +'</div></td>'
-    +'</tr>';
-  }).join(''):'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
 
-  document.getElementById('ACA').innerHTML=d.length?d.map(function(b){
+  /* Stats */
+  document.getElementById('AST').innerHTML=
+    '<div class="st"><div class="stn">'+BK.length+'</div><div class="stl">ทั้งหมด</div></div>'+
+    '<div class="st"><div class="stn" style="color:#d97706">'+BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+'</div><div class="stl">รอดำเนินการ</div></div>'+
+    '<div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">งบรวม ฿</div></div>';
+
+  /* ใช้ data-idx เก็บ index ใน BK[] แทนการส่ง string/uid ผ่าน onclick */
+  /* วิธีนี้ปลอดภัย 100% ไม่มีปัญหา type mismatch หรือ escaping */
+
+  var tableRows='';
+  var cardItems='';
+
+  for(var i=0;i<d.length;i++){
+    var b=d[i];
     var e=ge(b.eid)||{};
-    var k=JSON.stringify(b._uid||b.id);
-    return'<div class="bc">'
-      +'<div class="bch"><div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div><div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+stB(b.st)+'</div>'
-      +'<div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div>'
-      +'<div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div>'
-      +'<div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div>'
-      +'<div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div>'
-      +'<div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'
-      +(b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')
-      +'<div class="bca">'
-        +'<button class="btn bo" onclick="opEd('+k+')" style="font-size:13px;-webkit-flex:1;flex:1;touch-action:manipulation">✏️ แก้ไข</button>'
-        +'<button class="btn bd" onclick="askD('+k+')" style="font-size:13px;-webkit-flex:1;flex:1;touch-action:manipulation">🗑 ลบ</button>'
-      +'</div>'
-    +'</div>';
-  }).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
+    /* หา index จริงใน BK[] */
+    var realIdx=BK.indexOf(b);
+
+    tableRows+=
+      '<tr>'+
+      '<td><strong style="font-size:12px">'+(e.nm||'-')+'</strong><br>'+
+        '<span style="font-size:10px;color:var(--M)">'+(e.ps||'')+'</span></td>'+
+      '<td>R'+(e.r||'-')+'</td>'+
+      '<td>'+b.br+'</td>'+
+      '<td>'+fD(b.ci)+'</td>'+
+      '<td>'+fD(b.co)+'</td>'+
+      '<td><strong>'+b.n+'</strong></td>'+
+      '<td>'+stB(b.st)+'</td>'+
+      '<td>'+(b.ht||'-')+'</td>'+
+      '<td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td>'+
+      '<td>'+
+        '<div style="display:flex;gap:5px">'+
+          '<button class="btn bo bs adm-edit" data-idx="'+realIdx+'" style="font-size:11px">✏️ แก้ไข</button>'+
+          '<button class="btn bd bs adm-del" data-idx="'+realIdx+'" style="font-size:11px">🗑 ลบ</button>'+
+        '</div>'+
+      '</td>'+
+      '</tr>';
+
+    cardItems+=
+      '<div class="bc">'+
+      '<div class="bch">'+
+        '<div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div>'+
+        '<div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+
+        stB(b.st)+
+      '</div>'+
+      '<div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div>'+
+      '<div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div>'+
+      '<div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div>'+
+      '<div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div>'+
+      '<div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'+
+      (b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')+
+      '<div class="bca">'+
+        '<button class="btn bo adm-edit" data-idx="'+realIdx+'" style="font-size:13px;flex:1">✏️ แก้ไข</button>'+
+        '<button class="btn bd adm-del" data-idx="'+realIdx+'" style="font-size:13px;flex:1">🗑 ลบ</button>'+
+      '</div>'+
+      '</div>';
+  }
+
+  var emptyTable='<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
+  var emptyCard='<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
+
+  document.getElementById('ATB').innerHTML=d.length?tableRows:emptyTable;
+  document.getElementById('ACA').innerHTML=d.length?cardItems:emptyCard;
+
+  /* ผูก event listener แบบ delegation บน parent — ทำงานได้ทุก browser */
+  bindAdminButtons();
 }
 
-/* ── EDIT MODAL ───────────────────────────────────────────────────
-   opEd รับ key ที่เป็นได้ทั้ง:
-   - number (record เก่า ใช้ id ตัวเลข)
-   - string uid เช่น "r1a2b3c4d" (record ใหม่)
-   ─────────────────────────────────────────────────────────────── */
-function findRec(key){
-  /* ค้นหาด้วย _uid ก่อน (record ใหม่) ถ้าไม่เจอค้นด้วย id (record เก่า) */
-  return BK.find(function(x){return x._uid===key;})||
-         BK.find(function(x){return x.id===key;})||
-         BK.find(function(x){return String(x.id)===String(key)||String(x._uid)===String(key);});
+/* ══════════════════════════════════════════════════════════════════
+   EVENT DELEGATION — ผูก click ที่ parent เดียว ไม่ใช้ inline onclick
+   ทำงานได้ทุก platform รวมถึง Android WebView เก่า
+   ══════════════════════════════════════════════════════════════════ */
+var _adminBound=false;
+function bindAdminButtons(){
+  /* ผูกครั้งเดียวที่ #V2 container — ใช้ event delegation */
+  if(_adminBound)return;
+  _adminBound=true;
+
+  var v2=document.getElementById('V2');
+  if(!v2)return;
+
+  function handleClick(e){
+    /* หา button ที่ถูกกด (อาจกด SVG หรือ text ข้างใน) */
+    var btn=e.target;
+    while(btn&&btn!==v2){
+      if(btn.classList&&(btn.classList.contains('adm-edit')||btn.classList.contains('adm-del')))break;
+      btn=btn.parentNode;
+    }
+    if(!btn||btn===v2)return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var idx=parseInt(btn.getAttribute('data-idx'),10);
+    if(isNaN(idx)||idx<0||idx>=BK.length)return;
+
+    if(btn.classList.contains('adm-edit')){
+      opEd(idx);
+    } else if(btn.classList.contains('adm-del')){
+      askD(idx);
+    }
+  }
+
+  /* ผูกทั้ง click และ touchend เพื่อรองรับ Mobile */
+  v2.addEventListener('click',handleClick);
+  v2.addEventListener('touchend',function(e){
+    /* ป้องกัน double-fire บน Android */
+    if(e.cancelable)e.preventDefault();
+    handleClick(e);
+  },{passive:false});
 }
 
-function opEd(key){
-  var b=findRec(key);
-  if(!b){tt('ไม่พบรายการ — กรุณา Refresh','er');return;}
-  EID=key; /* เก็บ key ที่ใช้ค้นหา */
-  var e=ge(b.eid)||{};MEI=b.eid;
-  document.getElementById('MDV').value=e.nm?e.nm+' ('+e.nk+') — R'+e.r:'';
+/* ══════════════════════════════════════════════════════════════════
+   MODAL SYSTEM — เรียบง่าย ไม่ใช้ transition ที่ทำให้ Android ค้าง
+   ══════════════════════════════════════════════════════════════════ */
+function showModal(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.style.cssText='display:flex;visibility:visible;';
+  el.classList.add('op');
+  document.body.style.overflow='hidden';
+}
+function hideModal(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('op');
+  el.style.cssText='display:none;visibility:hidden;';
+  document.body.style.overflow='';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EDIT MODAL FUNCTIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* เปิด Modal แก้ไข — รับ index ใน BK[] */
+function opEd(idx){
+  idx=parseInt(idx,10);
+  var b=BK[idx];
+  if(!b){tt('ไม่พบรายการ','er');return;}
+  EID=idx; /* เก็บ index */
+  var e=ge(b.eid)||{};
+  MEI=b.eid;
+  document.getElementById('MDV').value=e.nm?(e.nm+' ('+e.nk+') — R'+e.r):'';
   document.getElementById('MFD').value=b.dt||'';
   document.getElementById('MFB').value=b.br||'';
   document.getElementById('MCI').value=b.ci||'';
   document.getElementById('MCO').value=b.co||'';
-  document.getElementById('MNT').value=b.nt||'';mCN();
+  document.getElementById('MNT').value=b.nt||'';
+  mCN();
   document.getElementById('MST2').value=b.st||'รอดำเนินการ';
   document.getElementById('MHT').value=b.ht||'';
   document.getElementById('MPR').value=b.pr||'';
   document.getElementById('MTO').value=b.tot||'';
   document.getElementById('MRV').value=b.rv||'';
   rEO('','MDO',true);
-  var me=document.getElementById('ME');
-  me.style.display='-webkit-flex';me.style.display='flex';
-  me.classList.add('op');
-  document.body.style.overflow='hidden';
+  showModal('ME');
 }
+
+/* ปิด Modal แก้ไข */
 function cEd(){
-  var me=document.getElementById('ME');
-  me.classList.remove('op');
-  /* รอ animation เสร็จแล้วค่อย hide */
-  setTimeout(function(){if(!me.classList.contains('op'))me.style.display='none';},300);
-  document.body.style.overflow='';MO=false;
+  hideModal('ME');
+  MO=false;
 }
+
+/* บันทึกการแก้ไข */
 function svEd(){
-  var b=findRec(EID);
+  var idx=parseInt(EID,10);
+  var b=BK[idx];
   if(!b){tt('ไม่พบรายการ — กรุณา Refresh','er');cEd();return;}
-  var ci=document.getElementById('MCI').value,co=document.getElementById('MCO').value,n=nts(ci,co)||b.n;
+
+  /* ── ตรวจสอบ _uid ก่อนเสมอ ── */
+  if(!b._uid||!b.id){
+    var newKey=uid();
+    b._uid=newKey;
+    b.id=newKey;
+  }
+  var recKey=String(b._uid); /* key ที่ใช้กับ Firebase — ต้องคงเดิมเสมอ */
+
+  /* ── อัปเดตข้อมูลใน object เดิม (in-place) ── */
   if(MEI)b.eid=MEI;
+  var ci=document.getElementById('MCI').value;
+  var co=document.getElementById('MCO').value;
   b.dt=document.getElementById('MFD').value||b.dt;
   b.br=document.getElementById('MFB').value||b.br;
-  b.ci=ci||b.ci;b.co=co||b.co;b.n=n;
+  b.ci=ci||b.ci;
+  b.co=co||b.co;
+  b.n=nts(ci,co)||b.n;
   b.nt=document.getElementById('MNT').value;
   b.st=document.getElementById('MST2').value;
   b.ht=document.getElementById('MHT').value;
@@ -1151,51 +1320,59 @@ function svEd(){
   b.tot=parseFloat(document.getElementById('MTO').value)||0;
   b.rv=document.getElementById('MRV').value;
   b.ua=Date.now();
-  if(!b._uid)b._uid=uid();
-  cEd();fbUpdateRecord(b);rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
+  b._uid=recKey; /* ยืนยัน key เดิมไม่เปลี่ยน */
+  b.id=recKey;
+
+  /* ── อัปเดต BK[idx] โดยตรง — ไม่สร้าง record ใหม่ ── */
+  BK[idx]=b;
+
+  cEd();
+  fbUpdateRecord(b);  /* PATCH ที่ key เดิม → Firebase ไม่สร้างใหม่ */
+  lsS();
+  rA();rM();rEx();
+  tt('บันทึกเรียบร้อย ✓','ok');
 }
-function askD(key){
-  DID=key;
-  var b=findRec(key);
+
+/* ══════════════════════════════════════════════════════════════════
+   DELETE FUNCTIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* เปิด Confirm Dialog ลบ — รับ index ใน BK[] */
+function askD(idx){
+  idx=parseInt(idx,10);
+  var b=BK[idx];
   var e=ge(b?b.eid:null)||{};
+  DID=idx; /* เก็บ index */
   document.getElementById('CDM').innerHTML=
     '<strong>'+(e.nm||'รายการนี้')+'</strong><br>'+
     (b?b.br:'')+' | '+(b?fD(b.ci):'')+
     '<br><br><span style="color:#dc2626;font-size:12px">⚠️ ลบถาวร กู้คืนไม่ได้</span>';
-  var cd=document.getElementById('CD');
-  cd.style.display='-webkit-flex';cd.style.display='flex';
-  cd.classList.add('op');
-  document.getElementById('ME').classList.remove('op');
-  document.body.style.overflow='hidden';
+  hideModal('ME'); /* ปิด Edit Modal ก่อน */
+  showModal('CD'); /* เปิด Confirm Dialog */
 }
+
+/* ยกเลิกการลบ */
 function cConf(){
-  var cd=document.getElementById('CD');
-  cd.classList.remove('op');
-  setTimeout(function(){if(!cd.classList.contains('op'))cd.style.display='none';},300);
-  document.body.style.overflow='';DID=null;
-}
-function doDel(){
-  if(!DID)return;
-  var b=findRec(DID);
-  var recUid=b?b._uid:null;
-  /* ลบออกจาก local array */
-  BK=BK.filter(function(x){
-    return x._uid!==DID && x.id!==DID && String(x._uid)!==String(DID) && String(x.id)!==String(DID);
-  });
-  NI=nxId();
-  cConf();
-  if(recUid){
-    fbDeleteRecord(recUid);
-  } else {
-    lsS(); /* อย่างน้อยบันทึก local */
-    tt('ลบ local แล้ว (ไม่พบ _uid)','ok');
-  }
-  rA();rM();rEx();
-  tt('ลบรายการเรียบร้อย ✓','ok');
+  hideModal('CD');
   DID=null;
 }
 
-/* ── EXPORT ───────────────────── */
+/* ยืนยันลบ */
+function doDel(){
+  var idx=parseInt(DID,10);
+  var b=BK[idx];
+  if(!b){hideModal('CD');DID=null;return;}
+  var recUid=b._uid||b.id||null;
+  BK.splice(idx,1); /* ลบออกจาก array โดยตรง — แม่นยำ 100% */
+  NI=nxId();
+  hideModal('CD');
+  DID=null;
+  if(recUid)fbDeleteRecord(String(recUid));
+  else lsS();
+  rA();rM();rEx();
+  tt('ลบรายการเรียบร้อย ✓','ok');
+}
+
 function bR(data){return data.map(function(b){var e=ge(b.eid)||{};return{'ชื่อพนักงาน':e.nm||'','Regional':e.r||'','ตำแหน่ง':e.ps||'','วันที่จอง':fX(b.dt),'สาขา':b.br,'Check-in':fX(b.ci),'Check-out':fX(b.co),'จำนวนคืน':b.n,'หมายเหตุ':b.nt||'','สถานะ':b.st||'รอดำเนินการ','ชื่อที่พัก':b.ht||'','ราคา/คืน (฿)':b.pr||'','ราคารวม (฿)':b.tot||'','รีวิวที่พัก':b.rv||''};});}
 function dlX(rows,fn){var ws=XLSX.utils.json_to_sheet(rows);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'ข้อมูลการจอง');XLSX.writeFile(wb,fn);}
 function exAll(){if(!BK.length){tt('ไม่มีข้อมูล','er');return;}dlX(bR(BK),'จองที่พัก_ทั้งหมด_'+fX(new Date().toISOString().slice(0,10))+'.xlsx');tt('ดาวน์โหลดเรียบร้อย ✓','ok');}
