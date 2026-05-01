@@ -419,10 +419,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <!-- EDIT MODAL -->
-<div class="mb" id="ME">
+<div class="mb" id="ME" style="display:none">
   <div class="mo">
     <div class="mh2"></div>
-    <div class="mh"><h3>แก้ไขรายการ (Admin)</h3><button class="mx" onclick="cEd()">×</button></div>
+    <div class="mh"><h3>✏️ แก้ไขรายการ (Admin)</h3><button class="mx" onclick="cEd()" style="touch-action:manipulation">×</button></div>
     <div class="mby">
       <div class="ms">
         <div class="mst">ข้อมูลพนักงาน — แก้ไขได้ทั้งหมด</div>
@@ -448,21 +448,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
     <div class="mf">
-      <button class="btn bd bs" onclick="askD(eId)" style="flex:0 0 auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button>
-      <div style="flex:1"></div>
-      <button class="btn bo bs" onclick="cEd()">ยกเลิก</button>
-      <button class="btn bp bs" onclick="svEd()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>บันทึก</button>
+      <button class="btn bd bs" onclick="askD(EID)" style="-webkit-flex:0 0 auto;flex:0 0 auto;touch-action:manipulation">🗑 ลบ</button>
+      <div style="-webkit-flex:1;flex:1"></div>
+      <button class="btn bo bs" onclick="cEd()" style="touch-action:manipulation">ยกเลิก</button>
+      <button class="btn bp bs" onclick="svEd()" style="touch-action:manipulation"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>บันทึก</button>
     </div>
   </div>
 </div>
 
 <!-- CONFIRM DEL -->
-<div class="cb" id="CD">
+<div class="cb" id="CD" style="display:none">
   <div class="cbx">
     <div class="cbi"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
     <div class="cbt">ยืนยันการลบ?</div>
     <div class="cbm" id="CDM">รายการจะถูกลบถาวร</div>
-    <div class="cbb"><button class="btn bo" onclick="cConf()">ยกเลิก</button><button class="btn bd" onclick="doDel()">ลบออกเลย</button></div>
+    <div class="cbb">
+      <button class="btn bo" onclick="cConf()" style="touch-action:manipulation">ยกเลิก</button>
+      <button class="btn bd" onclick="doDel()" style="touch-action:manipulation">ลบออกเลย</button>
+    </div>
   </div>
 </div>
 
@@ -1052,58 +1055,143 @@ function rA(){
   var d=BK.filter(function(b){var e=ge(b.eid)||{};return(!nF||((e.nm||'')+b.br).toLowerCase().indexOf(nF)>=0)&&(!sF||b.st===sF)&&(!fr||b.ci>=fr)&&(!to||b.co<=to);});
   var tot=BK.reduce(function(a,b){return a+(b.tot||0);},0);
   document.getElementById('AST').innerHTML='<div class="st"><div class="stn">'+BK.length+'</div><div class="stl">ทั้งหมด</div></div><div class="st"><div class="stn" style="color:#d97706">'+BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+'</div><div class="stl">รอดำเนินการ</div></div><div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">งบรวม ฿</div></div>';
-  document.getElementById('ATB').innerHTML=d.length?d.map(function(b){var e=ge(b.eid)||{};return'<tr><td><strong style="font-size:12px">'+(e.nm||'-')+'</strong><br><span style="font-size:10px;color:var(--M)">'+(e.ps||'')+'</span></td><td>R'+(e.r||'-')+'</td><td>'+b.br+'</td><td>'+fD(b.ci)+'</td><td>'+fD(b.co)+'</td><td><strong>'+b.n+'</strong></td><td>'+stB(b.st)+'</td><td>'+(b.ht||'-')+'</td><td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td><td><div style="display:flex;gap:5px"><button class="btn bo bs" onclick="opEd('+b.id+')" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้ไข</button><button class="btn bd bs" onclick="askD('+b.id+')" style="font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button></div></td></tr>';}).join(''):'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
-  document.getElementById('ACA').innerHTML=d.length?d.map(function(b){var e=ge(b.eid)||{};return'<div class="bc"><div class="bch"><div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div><div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+stB(b.st)+'</div><div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div><div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div><div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div><div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div><div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'+(b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')+'<div class="bca"><button class="btn bo" onclick="opEd('+b.id+')" style="font-size:13px"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้ไข</button><button class="btn bd" onclick="askD('+b.id+')" style="font-size:13px"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>ลบ</button></div></div>';}).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
+  /* ใช้ _uid เป็น key — ทำงานถูกต้องทั้ง record เก่าและใหม่ */
+  document.getElementById('ATB').innerHTML=d.length?d.map(function(b){
+    var e=ge(b.eid)||{};
+    var k=JSON.stringify(b._uid||b.id); /* JSON.stringify เพื่อให้ได้ quoted string ที่ปลอดภัย */
+    return'<tr>'
+      +'<td><strong style="font-size:12px">'+(e.nm||'-')+'</strong><br><span style="font-size:10px;color:var(--M)">'+(e.ps||'')+'</span></td>'
+      +'<td>R'+(e.r||'-')+'</td>'
+      +'<td>'+b.br+'</td>'
+      +'<td>'+fD(b.ci)+'</td>'
+      +'<td>'+fD(b.co)+'</td>'
+      +'<td><strong>'+b.n+'</strong></td>'
+      +'<td>'+stB(b.st)+'</td>'
+      +'<td>'+(b.ht||'-')+'</td>'
+      +'<td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td>'
+      +'<td><div style="display:-webkit-flex;display:flex;gap:5px">'
+        +'<button class="btn bo bs" onclick="opEd('+k+')" style="font-size:11px;touch-action:manipulation">✏️ แก้ไข</button>'
+        +'<button class="btn bd bs" onclick="askD('+k+')" style="font-size:11px;touch-action:manipulation">🗑 ลบ</button>'
+      +'</div></td>'
+    +'</tr>';
+  }).join(''):'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
+
+  document.getElementById('ACA').innerHTML=d.length?d.map(function(b){
+    var e=ge(b.eid)||{};
+    var k=JSON.stringify(b._uid||b.id);
+    return'<div class="bc">'
+      +'<div class="bch"><div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div><div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+stB(b.st)+'</div>'
+      +'<div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div>'
+      +'<div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div>'
+      +'<div class="bcr"><span class="bcl">Check-out</span><span class="bcv">'+fD(b.co)+' ('+b.n+' คืน)</span></div>'
+      +'<div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div>'
+      +'<div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'
+      +(b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')
+      +'<div class="bca">'
+        +'<button class="btn bo" onclick="opEd('+k+')" style="font-size:13px;-webkit-flex:1;flex:1;touch-action:manipulation">✏️ แก้ไข</button>'
+        +'<button class="btn bd" onclick="askD('+k+')" style="font-size:13px;-webkit-flex:1;flex:1;touch-action:manipulation">🗑 ลบ</button>'
+      +'</div>'
+    +'</div>';
+  }).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
 }
 
-/* ── EDIT MODAL ───────────────── */
-function opEd(id){
-  EID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b.eid)||{};MEI=b.eid;
+/* ── EDIT MODAL ───────────────────────────────────────────────────
+   opEd รับ key ที่เป็นได้ทั้ง:
+   - number (record เก่า ใช้ id ตัวเลข)
+   - string uid เช่น "r1a2b3c4d" (record ใหม่)
+   ─────────────────────────────────────────────────────────────── */
+function findRec(key){
+  /* ค้นหาด้วย _uid ก่อน (record ใหม่) ถ้าไม่เจอค้นด้วย id (record เก่า) */
+  return BK.find(function(x){return x._uid===key;})||
+         BK.find(function(x){return x.id===key;})||
+         BK.find(function(x){return String(x.id)===String(key)||String(x._uid)===String(key);});
+}
+
+function opEd(key){
+  var b=findRec(key);
+  if(!b){tt('ไม่พบรายการ — กรุณา Refresh','er');return;}
+  EID=key; /* เก็บ key ที่ใช้ค้นหา */
+  var e=ge(b.eid)||{};MEI=b.eid;
   document.getElementById('MDV').value=e.nm?e.nm+' ('+e.nk+') — R'+e.r:'';
-  document.getElementById('MFD').value=b.dt||'';document.getElementById('MFB').value=b.br||'';
-  document.getElementById('MCI').value=b.ci||'';document.getElementById('MCO').value=b.co||'';
+  document.getElementById('MFD').value=b.dt||'';
+  document.getElementById('MFB').value=b.br||'';
+  document.getElementById('MCI').value=b.ci||'';
+  document.getElementById('MCO').value=b.co||'';
   document.getElementById('MNT').value=b.nt||'';mCN();
-  document.getElementById('MST2').value=b.st||'รอดำเนินการ';document.getElementById('MHT').value=b.ht||'';
-  document.getElementById('MPR').value=b.pr||'';document.getElementById('MTO').value=b.tot||'';
+  document.getElementById('MST2').value=b.st||'รอดำเนินการ';
+  document.getElementById('MHT').value=b.ht||'';
+  document.getElementById('MPR').value=b.pr||'';
+  document.getElementById('MTO').value=b.tot||'';
   document.getElementById('MRV').value=b.rv||'';
   rEO('','MDO',true);
-  document.getElementById('ME').classList.add('op');document.body.style.overflow='hidden';
+  var me=document.getElementById('ME');
+  me.style.display='-webkit-flex';me.style.display='flex';
+  me.classList.add('op');
+  document.body.style.overflow='hidden';
 }
-function cEd(){document.getElementById('ME').classList.remove('op');document.body.style.overflow='';MO=false;}
+function cEd(){
+  var me=document.getElementById('ME');
+  me.classList.remove('op');
+  /* รอ animation เสร็จแล้วค่อย hide */
+  setTimeout(function(){if(!me.classList.contains('op'))me.style.display='none';},300);
+  document.body.style.overflow='';MO=false;
+}
 function svEd(){
-  var b=BK.find(function(x){return x.id===EID;});
-  if(!b){tt('ไม่พบรายการ','er');return;}
+  var b=findRec(EID);
+  if(!b){tt('ไม่พบรายการ — กรุณา Refresh','er');cEd();return;}
   var ci=document.getElementById('MCI').value,co=document.getElementById('MCO').value,n=nts(ci,co)||b.n;
   if(MEI)b.eid=MEI;
-  b.dt=document.getElementById('MFD').value||b.dt;b.br=document.getElementById('MFB').value||b.br;
-  b.ci=ci||b.ci;b.co=co||b.co;b.n=n;b.nt=document.getElementById('MNT').value;
-  b.st=document.getElementById('MST2').value;b.ht=document.getElementById('MHT').value;
-  b.pr=parseFloat(document.getElementById('MPR').value)||0;b.tot=parseFloat(document.getElementById('MTO').value)||0;
-  b.rv=document.getElementById('MRV').value;b.ua=Date.now();
-  /* ถ้า record นี้ยังไม่มี _uid (ข้อมูลเก่า) สร้างให้ */
+  b.dt=document.getElementById('MFD').value||b.dt;
+  b.br=document.getElementById('MFB').value||b.br;
+  b.ci=ci||b.ci;b.co=co||b.co;b.n=n;
+  b.nt=document.getElementById('MNT').value;
+  b.st=document.getElementById('MST2').value;
+  b.ht=document.getElementById('MHT').value;
+  b.pr=parseFloat(document.getElementById('MPR').value)||0;
+  b.tot=parseFloat(document.getElementById('MTO').value)||0;
+  b.rv=document.getElementById('MRV').value;
+  b.ua=Date.now();
   if(!b._uid)b._uid=uid();
   cEd();fbUpdateRecord(b);rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
 }
-function askD(id){
-  DID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b?b.eid:null)||{};
-  document.getElementById('CDM').innerHTML='<strong>'+(e.nm||'รายการนี้')+'</strong><br>'+(b?b.br:'')+' | '+(b?fD(b.ci):'')+'<br><br><span style="color:#dc2626;font-size:12px">ลบถาวร กู้คืนไม่ได้</span>';
-  document.getElementById('CD').classList.add('op');document.getElementById('ME').classList.remove('op');document.body.style.overflow='hidden';
+function askD(key){
+  DID=key;
+  var b=findRec(key);
+  var e=ge(b?b.eid:null)||{};
+  document.getElementById('CDM').innerHTML=
+    '<strong>'+(e.nm||'รายการนี้')+'</strong><br>'+
+    (b?b.br:'')+' | '+(b?fD(b.ci):'')+
+    '<br><br><span style="color:#dc2626;font-size:12px">⚠️ ลบถาวร กู้คืนไม่ได้</span>';
+  var cd=document.getElementById('CD');
+  cd.style.display='-webkit-flex';cd.style.display='flex';
+  cd.classList.add('op');
+  document.getElementById('ME').classList.remove('op');
+  document.body.style.overflow='hidden';
 }
-function cConf(){document.getElementById('CD').classList.remove('op');document.body.style.overflow='';DID=null;}
+function cConf(){
+  var cd=document.getElementById('CD');
+  cd.classList.remove('op');
+  setTimeout(function(){if(!cd.classList.contains('op'))cd.style.display='none';},300);
+  document.body.style.overflow='';DID=null;
+}
 function doDel(){
   if(!DID)return;
-  var b=BK.find(function(x){return x.id===DID;});
+  var b=findRec(DID);
   var recUid=b?b._uid:null;
-  BK=BK.filter(function(x){return x.id!==DID;});
+  /* ลบออกจาก local array */
+  BK=BK.filter(function(x){
+    return x._uid!==DID && x.id!==DID && String(x._uid)!==String(DID) && String(x.id)!==String(DID);
+  });
   NI=nxId();
   cConf();
   if(recUid){
-    fbDeleteRecord(recUid); /* Soft delete — atomic ไม่กระทบ record อื่น */
+    fbDeleteRecord(recUid);
   } else {
-    fbSave(); /* fallback */
+    lsS(); /* อย่างน้อยบันทึก local */
+    tt('ลบ local แล้ว (ไม่พบ _uid)','ok');
   }
-  rA(); rM(); rEx();
-  tt('ลบรายการเรียบร้อย','ok');
+  rA();rM();rEx();
+  tt('ลบรายการเรียบร้อย ✓','ok');
   DID=null;
 }
 
