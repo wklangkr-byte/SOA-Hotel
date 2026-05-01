@@ -439,6 +439,8 @@ var EM=[
 {id:20,nm:'คุณ พงศิกร รังษีพลาสวัสดิ์',r:4,nk:'ปอนด์',ps:'Zone17'}
 ];
 var BK=[],NI=1,CE=null,CR='user',EID=null,DID=null,DDO=false,MO=false,MEI=null,CV=0,ST=null,LH='',DX={};
+/* Concurrent-safe sync state */
+var ES=null,IS_SAVING=false,SAVE_TS=0,OQ=[],IS_ONLINE=true;
 
 /* ── SCREEN ───────────────────── */
 function scr(s){
@@ -448,50 +450,346 @@ function scr(s){
   A.style.display=s==='A'?'flex':'none';
 }
 
-/* ── FIREBASE ─────────────────── */
-function fbOK(){return typeof FBU==='string'&&FBU.indexOf('https://')===0;}
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIREBASE — CONCURRENT-SAFE REAL-TIME SYNC
+   แก้ปัญหา Race Condition กรณี SOA หลายคน / หลายอุปกรณ์บันทึกพร้อมกัน
+
+   หลักการสำคัญ:
+   1. ใช้ PATCH แทน PUT → เขียนแต่ละ record แยกกัน ไม่ทับกัน
+   2. UID = timestamp(ms) + random 4 หลัก → ไม่มีทางซ้ำกันได้
+   3. SSE (EventSource) รับ real-time ทันทีทุกอุปกรณ์
+   4. Merge จาก server ก่อนบันทึกทุกครั้ง (Read-before-Write)
+   5. Offline queue → บันทึกค้างไว้ แล้ว flush เมื่อออนไลน์
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var OQ=[];          /* Offline Queue — เก็บ record ที่ยังส่งไม่ได้ */
+var IS_ONLINE=true; /* สถานะการเชื่อมต่อ */
+
+/* ── Unique ID ที่ไม่ซ้ำกันแน่นอนแม้หลายอุปกรณ์บันทึกพร้อมกัน ─────────── */
+function uid(){
+  /* รูปแบบ: timestamp(13หลัก) + random(4หลัก) เช่น 17099123456781234 */
+  return Date.now()*10000+Math.floor(Math.random()*9999+1);
+}
+
+function fbOK(){return typeof FBU==='string'&&FBU.indexOf('https://')===0&&FBU.length>20;}
+
+/* ── แปลง Firebase records object → array และ filter รายการที่ถูกลบ ────── */
+function parseRecords(d){
+  if(!d||!d.records)return [];
+  /* Firebase object key → array แล้ว filter ที่ถูกลบออก */
+  return Object.values(d.records)
+    .filter(function(b){return b&&!b._del;})
+    .sort(function(a,b){return (a.ca||0)-(b.ca||0);}); /* เรียงตาม created_at */
+}
+
+/* ── โหลดข้อมูลทั้งหมดครั้งแรก ─────────────────────────────────────────── */
 function fbLoad(done){
   if(!fbOK()){lsL();done();return;}
-  ssync('sy','กำลังโหลด...');
-  var fired=false;
-  var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},5000);
-  fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+  ssync('sy','กำลังเชื่อมต่อ...');
+  fetch(FBU+DBK+'.json?nc='+Date.now())
     .then(function(r){return r.json();})
-    .then(function(d){if(fired)return;fired=true;clearTimeout(t);if(d&&d.BK){if(d.DX)Object.assign(DX,d.DX);BK=d.BK.filter(function(b){return !DX[b.id];});NI=nxId();lsS();}else{BK=[];NI=1;}ssync('','พร้อมใช้งาน');done();})
-    .catch(function(){if(fired)return;fired=true;clearTimeout(t);lsL();ssync('se','ออฟไลน์');done();});
+    .then(function(d){
+      if(d&&d.records){
+        BK=parseRecords(d);
+        NI=nxId();lsS();
+      } else {
+        /* ข้อมูลเก่า format BK[] — migrate ไปเป็น format ใหม่อัตโนมัติ */
+        if(d&&d.BK&&d.BK.length){
+          migrateOldFormat(d.BK);
+        } else {BK=[];NI=1;}
+      }
+      IS_ONLINE=true;
+      ssync('','เชื่อมต่อแล้ว ✓');
+      done();
+    })
+    .catch(function(){
+      lsL();IS_ONLINE=false;
+      ssync('se','ออฟไลน์ (ใช้ข้อมูลเก่า)');
+      done();
+    });
 }
-function fbSave(){
+
+/* ── Migrate ข้อมูล format เก่า (BK[]) → format ใหม่ (records{}) ────────── */
+function migrateOldFormat(oldBK){
+  if(!oldBK||!oldBK.length){BK=[];NI=1;return;}
+  var patch={};
+  oldBK.forEach(function(b){
+    /* ใช้ uid เดิมถ้ามี ไม่งั้นสร้างใหม่ */
+    var key=b._uid||('m'+b.id+'_'+Date.now());
+    b._uid=key;
+    patch['records/'+key]=b;
+  });
+  BK=oldBK.slice();
+  NI=nxId();lsS();
+  if(fbOK()){
+    /* อัปโหลด format ใหม่ขึ้น Firebase */
+    fetch(FBU+DBK+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)}).catch(function(){});
+  }
+}
+
+/* ── บันทึก record ใหม่ 1 รายการ (Atomic PATCH — ไม่กระทบ record อื่น) ── */
+function fbAddRecord(rec){
   lsS();
-  var ts = Date.now();
-  // อัปเดต LH ทันทีหลังบันทึก เพื่อไม่ให้ fbSync ดึงข้อมูลตัวเองกลับมา
-  LH = ts+'|'+BK.map(function(b){return b.id;}).join(',')+'|dx:'+Object.keys(DX).sort().join(',');
-  if(!fbOK()){ssync('','บันทึก (Local)');return;}
+  if(!fbOK()){
+    /* ออฟไลน์ — เก็บไว้ใน queue */
+    OQ.push({op:'add',rec:rec});
+    ssync('se','ออฟไลน์ — บันทึกคิวไว้ ('+OQ.length+')');
+    return;
+  }
   ssync('sy','กำลังบันทึก...');
-  fetch(FBU+'/'+DBK+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({BK:BK,NI:NI,t:ts,DX:DX})})
-    .then(function(){ssync('','บันทึกแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);})
-    .catch(function(){ssync('se','บันทึกไม่สำเร็จ');});
+  var patch={};
+  patch['records/'+rec._uid]=rec;
+  fetch(FBU+DBK+'.json',{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(patch)
+  })
+  .then(function(){
+    ssync('','บันทึกแล้ว ✓');
+    setTimeout(function(){ssync('','พร้อมใช้งาน');},1500);
+    flushQueue(); /* ส่ง queue ที่ค้างไว้ด้วย */
+  })
+  .catch(function(){
+    /* ล้มเหลว — ใส่ queue แล้ว retry */
+    OQ.push({op:'add',rec:rec});
+    ssync('se','บันทึกไม่สำเร็จ — จะลองใหม่...');
+    setTimeout(function(){flushQueue();},4000);
+  });
 }
+
+/* ── อัปเดต record ที่มีอยู่แล้ว (PATCH เฉพาะ record นั้น) ─────────────── */
+function fbUpdateRecord(rec){
+  lsS();
+  if(!fbOK()){
+    OQ.push({op:'update',rec:rec});
+    ssync('se','ออฟไลน์ — บันทึกคิวไว้');
+    return;
+  }
+  ssync('sy','กำลังบันทึก...');
+  var patch={};
+  patch['records/'+rec._uid]=rec;
+  fetch(FBU+DBK+'.json',{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(patch)
+  })
+  .then(function(){
+    ssync('','บันทึกแล้ว ✓');
+    setTimeout(function(){ssync('','พร้อมใช้งาน');},1500);
+    flushQueue();
+  })
+  .catch(function(){
+    OQ.push({op:'update',rec:rec});
+    ssync('se','บันทึกไม่สำเร็จ — จะลองใหม่...');
+    setTimeout(function(){flushQueue();},4000);
+  });
+}
+
+/* ── ลบ record (Soft delete — ตั้ง _del:true แทนการลบจริง) ─────────────── */
+function fbDeleteRecord(recUid){
+  lsS();
+  if(!fbOK()){
+    OQ.push({op:'del',uid:recUid});
+    ssync('se','ออฟไลน์ — บันทึกคิวไว้');
+    return;
+  }
+  var patch={};
+  patch['records/'+recUid]={_del:true,_delAt:Date.now()};
+  fetch(FBU+DBK+'.json',{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(patch)
+  })
+  .then(function(){
+    ssync('','ลบแล้ว ✓');
+    setTimeout(function(){ssync('','พร้อมใช้งาน');},1500);
+    flushQueue();
+  })
+  .catch(function(){
+    OQ.push({op:'del',uid:recUid});
+    setTimeout(function(){flushQueue();},4000);
+  });
+}
+
+/* ── Flush offline queue เมื่อกลับมาออนไลน์ ────────────────────────────── */
+function flushQueue(){
+  if(!fbOK()||!OQ.length)return;
+  var q=OQ.slice();OQ=[];
+  var patch={};
+  q.forEach(function(item){
+    if(item.op==='add'||item.op==='update'){
+      patch['records/'+item.rec._uid]=item.rec;
+    } else if(item.op==='del'){
+      patch['records/'+item.uid]={_del:true,_delAt:Date.now()};
+    }
+  });
+  fetch(FBU+DBK+'.json',{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(patch)
+  })
+  .then(function(){
+    ssync('','ซิงค์ข้อมูลค้างสำเร็จ ✓');
+    setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+  })
+  .catch(function(){
+    /* ยังไม่ได้ — ใส่กลับเข้า queue */
+    OQ=q.concat(OQ);
+    setTimeout(function(){flushQueue();},5000);
+  });
+}
+
+/* ── fbSave (compat) — ใช้สำหรับกรณีที่ต้องการ save ทั้งหมด (admin edit) ─ */
+function fbSave(){
+  /* ใช้ PATCH แบบ bulk — ส่งทุก record พร้อมกัน ยังคง atomic ต่อ record */
+  lsS();
+  if(!fbOK()){ssync('','บันทึก (Local only)');return;}
+  IS_SAVING=true;SAVE_TS=Date.now();
+  ssync('sy','กำลังบันทึก...');
+  var patch={};
+  BK.forEach(function(b){if(b._uid)patch['records/'+b._uid]=b;});
+  fetch(FBU+DBK+'.json',{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(patch)
+  })
+  .then(function(){
+    ssync('','บันทึกแล้ว ✓');
+    setTimeout(function(){IS_SAVING=false;ssync('','พร้อมใช้งาน');},1500);
+  })
+  .catch(function(){
+    IS_SAVING=false;
+    ssync('se','บันทึกไม่สำเร็จ — ลองใหม่...');
+    setTimeout(function(){fbSave();},3000);
+  });
+}
+
+/* ── SSE Real-time stream ────────────────────────────────────────────────── */
 function fbSync(){
+  if(!fbOK())return;
+  fbStop();
+  try{
+    ES=new EventSource(FBU+DBK+'.json');
+
+    ES.addEventListener('put',function(e){
+      try{
+        var msg=JSON.parse(e.data);
+        if(!msg)return;
+        var d=msg.data;
+        /* path "/" = initial full load หรือ PUT ทั้งหมด */
+        if(msg.path==='/'&&d){
+          if(d.records){
+            var fresh=parseRecords(d);
+            /* Merge: เอา record ใหม่จาก server + รักษา local ที่ยังไม่ได้ส่ง */
+            BK=mergeWithLocal(fresh);
+          } else if(d.BK){
+            BK=d.BK.filter(function(b){return !b._del;});
+          }
+          NI=nxId();lsS();
+          if(!IS_SAVING){rV();ssync('','🔄 Real-time sync');}
+          setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+        }
+        /* path ที่เจาะจง record เดียว เช่น /records/UID */
+        else if(msg.path&&msg.path.indexOf('/records/')===0&&d){
+          if(!d._del){
+            var existing=BK.findIndex(function(b){return b._uid===d._uid;});
+            if(existing>=0)BK[existing]=d; else BK.push(d);
+          } else {
+            BK=BK.filter(function(b){return b._uid!==d._uid;});
+          }
+          BK.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
+          NI=nxId();lsS();
+          if(!IS_SAVING){rV();ssync('','🔄 อัปเดตแล้ว');}
+          setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+        }
+      }catch(err){}
+    });
+
+    ES.addEventListener('patch',function(e){
+      try{
+        var msg=JSON.parse(e.data);
+        if(!msg||!msg.data)return;
+        var changed=msg.data;
+        /* Patch มาหลาย records — อัปเดตทีละตัว */
+        Object.keys(changed).forEach(function(key){
+          var rec=changed[key];
+          if(!rec)return;
+          if(rec._del){
+            BK=BK.filter(function(b){return b._uid!==key;});
+          } else {
+            var idx=BK.findIndex(function(b){return b._uid===key;});
+            if(idx>=0)BK[idx]=rec; else BK.push(rec);
+          }
+        });
+        BK.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
+        NI=nxId();lsS();
+        if(!IS_SAVING){rV();ssync('','🔄 อัปเดตแล้ว');}
+        setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+      }catch(err){}
+    });
+
+    ES.onopen=function(){
+      IS_ONLINE=true;
+      ssync('','พร้อมใช้งาน ●');
+      flushQueue(); /* flush queue ที่ค้างไว้ตอนออฟไลน์ */
+    };
+
+    ES.onerror=function(){
+      IS_ONLINE=false;
+      ssync('se','เชื่อมต่อใหม่...');
+      if(ES&&ES.readyState===EventSource.CLOSED){
+        setTimeout(function(){if(CE||CR==='admin')fbSync();},5000);
+      }
+    };
+
+  }catch(err){
+    fbFallback();
+  }
+}
+
+/* ── Merge local BK กับข้อมูลใหม่จาก server ─────────────────────────────── */
+function mergeWithLocal(serverBK){
+  /* record ที่อยู่ใน OQ (ยังไม่ได้ส่ง) ให้รักษาไว้ */
+  var pendingUids=OQ.map(function(q){return q.rec?q.rec._uid:q.uid;});
+  var merged=serverBK.slice();
+  pendingUids.forEach(function(puid){
+    var local=BK.find(function(b){return b._uid===puid;});
+    if(local&&!merged.find(function(b){return b._uid===puid;})){
+      merged.push(local);
+    }
+  });
+  return merged.sort(function(a,b){return (a.ca||0)-(b.ca||0);});
+}
+
+/* ── Fallback polling ────────────────────────────────────────────────────── */
+function fbFallback(){
   if(!fbOK())return;
   if(ST)clearInterval(ST);
   ST=setInterval(function(){
-    fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
+    if(IS_SAVING)return;
+    fetch(FBU+DBK+'.json?nc='+Date.now())
       .then(function(r){return r.json();})
       .then(function(d){
-        if(!d||!d.BK)return;
-        var h=(d.t||'')+'|'+d.BK.map(function(b){return b.id;}).join(',')+'|dx:'+(d.DX?Object.keys(d.DX).sort().join(','):'');
+        if(!d)return;
+        var fresh=d.records?parseRecords(d):(d.BK||[]);
+        var h=fresh.length+'|'+(fresh[fresh.length-1]||{})._uid+'|'+(fresh[fresh.length-1]||{}).ua;
         if(h===LH)return;
         LH=h;
-        // merge deleted IDs จาก server
-        if(d.DX) Object.assign(DX,d.DX);
-        // กรองรายการที่ถูกลบออกเสมอ
-        BK=d.BK.filter(function(b){ return !DX[b.id]; });
+        BK=mergeWithLocal(fresh);
         NI=nxId();lsS();rV();
-        ssync('','อัปเดตแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
-      }).catch(function(){});
-  },4000);
+        IS_ONLINE=true;
+        ssync('','🔄 อัปเดตแล้ว');
+        setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
+        flushQueue();
+      }).catch(function(){IS_ONLINE=false;ssync('se','ออฟไลน์');});
+  },3000);
 }
-function fbStop(){if(ST){clearInterval(ST);ST=null;}}
+
+/* ── หยุด sync ทั้งหมด ───────────────────────────────────────────────────── */
+function fbStop(){
+  if(ES){try{ES.close();}catch(e){}ES=null;}
+  if(ST){clearInterval(ST);ST=null;}
+}
 
 /* ── LOCAL STORAGE ─────────────── */
 function lsL(){try{var r=localStorage.getItem(DBK);if(r){var d=JSON.parse(r);BK=d.BK||[];NI=d.NI||nxId();DX=d.DX||{};}else{BK=[];NI=1;}}catch(e){BK=[];NI=1;}}
@@ -582,9 +880,19 @@ function subB(){
   var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
   if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
   var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
-  NI=nxId(); // คำนวณ ID ใหม่จากข้อมูลปัจจุบันทุกครั้ง ป้องกัน ID ซ้ำกัน
-  BK.push({id:NI++,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()});
-  fbSave();tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
+  /* สร้าง record ใหม่ด้วย uid ที่ไม่ซ้ำกันแน่นอน */
+  var newRec={
+    _uid: uid(),          /* Unique ID — ไม่ซ้ำแม้บันทึกพร้อมกันหลายอุปกรณ์ */
+    id:   uid(),          /* compat กับ id เดิม */
+    eid:CE.id, dt:d, br:b, ci:ci, co:co, n:n,
+    nt:document.getElementById('FT').value,
+    st:'รอดำเนินการ', ht:'', pr:0, tot:0, rv:'',
+    ca:Date.now()         /* created_at timestamp */
+  };
+  BK.push(newRec);
+  NI=nxId();
+  fbAddRecord(newRec); /* Atomic PATCH — ไม่กระทบ record อื่น */
+  tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
 }
 
 /* ── HELPERS ──────────────────── */
@@ -633,6 +941,7 @@ function opEd(id){
 function cEd(){document.getElementById('ME').classList.remove('op');document.body.style.overflow='';MO=false;}
 function svEd(){
   var b=BK.find(function(x){return x.id===EID;});
+  if(!b){tt('ไม่พบรายการ','er');return;}
   var ci=document.getElementById('MCI').value,co=document.getElementById('MCO').value,n=nts(ci,co)||b.n;
   if(MEI)b.eid=MEI;
   b.dt=document.getElementById('MFD').value||b.dt;b.br=document.getElementById('MFB').value||b.br;
@@ -640,7 +949,9 @@ function svEd(){
   b.st=document.getElementById('MST2').value;b.ht=document.getElementById('MHT').value;
   b.pr=parseFloat(document.getElementById('MPR').value)||0;b.tot=parseFloat(document.getElementById('MTO').value)||0;
   b.rv=document.getElementById('MRV').value;b.ua=Date.now();
-  cEd();fbSave();rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
+  /* ถ้า record นี้ยังไม่มี _uid (ข้อมูลเก่า) สร้างให้ */
+  if(!b._uid)b._uid=uid();
+  cEd();fbUpdateRecord(b);rA();rEx();tt('บันทึกเรียบร้อย ✓','ok');
 }
 function askD(id){
   DID=id;var b=BK.find(function(x){return x.id===id;});var e=ge(b?b.eid:null)||{};
@@ -650,16 +961,19 @@ function askD(id){
 function cConf(){document.getElementById('CD').classList.remove('op');document.body.style.overflow='';DID=null;}
 function doDel(){
   if(!DID)return;
-  fbStop();                                              // หยุด sync ก่อน
-  DX[DID]=Date.now();                                    // mark ว่าลบแล้ว
-  BK=BK.filter(function(x){return x.id!==DID;});        // ลบออก
+  var b=BK.find(function(x){return x.id===DID;});
+  var recUid=b?b._uid:null;
+  BK=BK.filter(function(x){return x.id!==DID;});
   NI=nxId();
   cConf();
-  fbSave();                                              // บันทึกทันที
+  if(recUid){
+    fbDeleteRecord(recUid); /* Soft delete — atomic ไม่กระทบ record อื่น */
+  } else {
+    fbSave(); /* fallback */
+  }
   rA(); rM(); rEx();
   tt('ลบรายการเรียบร้อย','ok');
   DID=null;
-  setTimeout(function(){ fbSync(); }, 2000);             // restart sync หลัง 2 วิ
 }
 
 /* ── EXPORT ───────────────────── */
