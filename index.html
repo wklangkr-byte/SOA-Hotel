@@ -65,6 +65,7 @@ html,body{font-family:'Sarabun',sans-serif;background:var(--BG);color:var(--T);m
 .sbar.sy{background:#eff6ff;color:#1a56db}
 .sbar.se{background:#fef2f2;color:#dc2626}
 .sbar.rt{background:#f0fdf4;color:#059669}
+.sbar.ok{background:#f0fdf4;color:#059669}
 .sbar.rt .sd{background:#059669;animation:rtpulse 1.5s ease-in-out infinite}
 @keyframes rtpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.7}}
 .sd{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
@@ -529,36 +530,32 @@ function fbLoad(done){
     });
 }
 
-/* แก้ไข: fbSave พร้อม retry 3 ครั้ง + save queue ป้องกัน concurrent write */
+/* ═══════════════════════════════════════════════════════════
+   FIREBASE SAVE + REALTIME SYNC
+   - fbSave  : PUT ข้อมูลขึ้น Firebase + retry 3 ครั้ง
+   - fbStartRT: เริ่ม polling ทุก 2 วิ — ทุกอุปกรณ์เห็นเหมือนกัน
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── fbSave ──────────────────────────────────────────────── */
 function fbSave(){
-  /* บันทึก localStorage ทันทีเสมอ เพื่อป้องกันข้อมูลหายถ้าปิด browser */
-  lsS();
-  if(!fbOK()){ssync('','บันทึก (Local)');return;}
-  if(SAVING){
-    SAVE_PENDING=true;
-    return;
-  }
+  lsS(); /* localStorage ก่อนเสมอ */
+  if(!fbOK()){ssync('','บันทึก (Local เท่านั้น)');return;}
+  if(SAVING){SAVE_PENDING=true;return;}
   _doFbSave(0);
 }
+
 function _doFbSave(attempt){
-  SAVING=true;SAVE_PENDING=false;
+  SAVING=true; SAVE_PENDING=false;
   var ts=Date.now();
   NI=nxId();
-  /* snapshot ข้อมูล ณ ตอนนี้ */
-  var bkSnap=BK.slice();
-  var dxSnap=JSON.parse(JSON.stringify(DX));
-  var payload=JSON.stringify({BK:bkSnap,NI:NI,t:ts,DX:dxSnap});
-  /* FIX: LH ใช้ BK IDs + DX เหมือนกับ fbSync เพื่อให้ตรงกัน */
-  var bkIds=bkSnap.map(function(b){return b.id;}).sort().join(',');
-  var dxKeys=Object.keys(dxSnap).sort().join(',');
-  LH=bkIds+'|dx:'+dxKeys;
+  var snap={BK:BK.slice(),NI:NI,t:ts,DX:JSON.parse(JSON.stringify(DX))};
+  var url=FBU.replace(/\/+$/,'')+'/'+DBK+'.json';
   ssync('sy','กำลังบันทึก...');
-  var saveUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json';
-  console.log('[fbSave] PUT',saveUrl,'records:',bkSnap.length,'attempt:',attempt);
-  fetch(saveUrl,{
+  console.log('[Save] PUT',url,'rows:',snap.BK.length,'try:',attempt);
+  fetch(url,{
     method:'PUT',
     headers:{'Content-Type':'application/json'},
-    body:payload
+    body:JSON.stringify(snap)
   })
   .then(function(r){
     if(!r.ok)throw new Error('HTTP '+r.status);
@@ -566,159 +563,76 @@ function _doFbSave(attempt){
   })
   .then(function(){
     SAVING=false;
-    console.log('[fbSave] OK records='+BK.length);
     lsS();
-    ssync('','บันทึกแล้ว ✓');
-    /* หลัง save สำเร็จ — SSE จะ push ไปยังอุปกรณ์อื่นอัตโนมัติ */
-    setTimeout(function(){
-      if(ES&&ES.readyState===1){
-        ssync('rt','⚡ Realtime');
-      }else{
-        /* ถ้าไม่มี SSE ให้ poll ทันที เพื่อให้อุปกรณ์อื่นเห็น */
-        fbPoll();
-        ssync('','พร้อมใช้งาน');
-      }
-    },1000);
+    console.log('[Save] OK rows='+BK.length);
+    ssync('ok','บันทึกแล้ว ✓');
+    setTimeout(function(){ssync('rt','⚡ Realtime');},1500);
     if(SAVE_PENDING)_doFbSave(0);
   })
   .catch(function(err){
-    console.warn('[fbSave] Error attempt='+attempt,err.message);
+    console.warn('[Save] fail attempt='+attempt,err.message);
     if(attempt<3){
-      var delay=[2000,4000,8000][attempt];
-      ssync('sy','กำลังลองใหม่ ('+(attempt+1)+'/3)...');
-      setTimeout(function(){_doFbSave(attempt+1);},delay);
+      ssync('sy','กำลังลองใหม่ ('+( attempt+1)+'/3)...');
+      setTimeout(function(){_doFbSave(attempt+1);},[2000,4000,8000][attempt]);
     }else{
-      SAVING=false;
-      /* FIX: reset LH เพื่อให้ fbSync รู้ว่าข้อมูลไม่ตรง */
-      LH='';
-      ssync('se','บันทึกไม่สำเร็จ — ข้อมูลในเครื่องปลอดภัย');
-      tt('⚠️ บันทึก Firebase ไม่สำเร็จ ข้อมูลในเครื่องยังอยู่ครบ','er');
+      SAVING=false; LH='';
+      ssync('se','บันทึกไม่สำเร็จ');
+      tt('⚠️ บันทึกไม่สำเร็จ ข้อมูลในเครื่องยังอยู่','er');
     }
   });
 }
 
-/* ── REALTIME SYNC ──────────────────────────────────────── */
-var ES=null;       /* EventSource SSE */
-var RT_FAIL=0;     /* SSE fail counter */
-var LAST_T=0;      /* timestamp ล่าสุดที่รับจาก server */
+/* ── Realtime Sync (Polling) ─────────────────────────────── */
+var POLL_IV=null;   /* interval handle */
+var POLL_BUSY=false;/* ป้องกัน concurrent poll */
 
-/* ─── applyServerData: merge data จาก Firebase → UI ─────── */
-function applyServerData(d){
+/* ฟังก์ชันกลาง: รับ data จาก Firebase แล้ว update UI */
+function applyData(d){
   if(!d||!d.BK||!Array.isArray(d.BK))return;
 
-  /* server timestamp ใหม่กว่าที่เคยรับ หรือยังไม่เคยรับเลย */
-  var st=d.t||0;
-
-  /* signature เปรียบ content ทุก field ที่สำคัญ
-     รวม ht, tot, st, pr, rv เพื่อจับการแก้ไขของ Admin */
-  function sig(arr,dx){
-    return JSON.stringify(
-      arr.map(function(b){
-        return b.id+'|'+(b.ua||b.ca||0)+'|'+(b.st||'')+'|'+(b.ht||'')
-              +'|'+(b.tot||0)+'|'+(b.pr||0)+'|'+(b.rv||'');
-      }).sort()
-    )+'|dx:'+JSON.stringify(Object.keys(dx||{}).sort());
+  /* สร้าง signature รวม content ทุก field สำคัญ */
+  function makeSig(arr,dx){
+    var s=arr.map(function(b){
+      return [b.id,b.st||'',b.ht||'',b.tot||0,b.pr||0,
+              b.rv||'',b.br||'',b.ci||'',b.co||'',
+              b.ua||b.ca||0].join('|');
+    }).sort().join(';');
+    return s+'~dx:'+Object.keys(dx||{}).sort().join(',');
   }
 
-  var serverSig=sig(d.BK,d.DX||{});
-  var localSig =sig(BK,DX);
-  if(serverSig===localSig&&st<=LAST_T)return; /* เหมือนกันทุกอย่าง */
-  LAST_T=st;
+  var svrSig=makeSig(d.BK,d.DX||{});
+  var locSig=makeSig(BK,DX);
+  if(svrSig===locSig)return; /* ข้อมูลเหมือนกัน ข้ามได้ */
 
-  /* merge DX */
+  /* merge deleted list */
   if(d.DX)Object.assign(DX,d.DX);
 
-  /* หา record ที่มีเฉพาะใน local และยังไม่ถูก delete */
-  var serverIdSet={};
-  d.BK.forEach(function(b){serverIdSet[b.id]=true;});
-  var localOnly=BK.filter(function(b){return !serverIdSet[b.id]&&!DX[b.id];});
+  /* หา record ที่อยู่ใน local แต่ยังไม่ถึง server */
+  var svrIds={};
+  d.BK.forEach(function(b){svrIds[b.id]=true;});
+  var pending=BK.filter(function(b){return !svrIds[b.id]&&!DX[b.id];});
 
-  /* server = source of truth */
+  /* ใช้ server เป็น source of truth */
   BK=d.BK.filter(function(b){return !DX[b.id];});
 
-  if(localOnly.length){
-    BK=BK.concat(localOnly);
+  if(pending.length){
+    BK=BK.concat(pending);
     NI=nxId();
-    /* ส่ง localOnly ขึ้น server — ไม่ block UI */
-    setTimeout(function(){
-      if(!SAVING){LH='';fbSave();}
-    },600);
+    console.log('[Sync] pending='+pending.length+' uploading...');
+    if(!SAVING){LH='';setTimeout(function(){fbSave();},400);}
   }else{
     NI=Math.max(d.NI||1,nxId());
   }
 
   lsS();
-  rV(); /* refresh UI ทันที — ทุก user เห็นเหมือนกัน */
-
-  if(ES&&ES.readyState===1){
-    ssync('rt','⚡ Realtime');
-  }else{
-    ssync('','อัปเดตแล้ว ✓');
-    setTimeout(function(){ssync('','พร้อมใช้งาน');},2000);
-  }
-  console.log('[RT] applied BK='+BK.length+' localOnly='+localOnly.length);
+  rV(); /* ← อัปเดต UI ทันที ทุก user เห็นพร้อมกัน */
+  console.log('[Sync] updated BK='+BK.length);
+  ssync('rt','⚡ Realtime');
 }
 
-/* ─── SSE: Firebase push realtime ──────────────────────── */
-function fbSSE(){
-  if(!fbOK())return;
-  if(ES){try{ES.close();}catch(e){}ES=null;}
-
-  /* Firebase REST SSE — ต้องใส่ Accept header ผ่าน URL trick */
-  var sseUrl=FBU.replace(/\/+$/,'')+'/'+DBK+'.json';
-  try{
-    ES=new EventSource(sseUrl);
-  }catch(e){
-    console.warn('[SSE] EventSource not supported');
-    fbSync();return;
-  }
-
-  ES.addEventListener('put',function(evt){
-    try{
-      var msg=JSON.parse(evt.data);
-      /* Firebase put: {path:'/', data:{BK:[...],NI:...,t:...,DX:{...}}} */
-      if(msg&&msg.data&&msg.path==='/'){
-        console.log('[SSE] put received');
-        applyServerData(msg.data);
-      }else if(msg&&msg.data===null){
-        /* path='/' data=null หมายถึง node ถูกลบ — ไม่ทำอะไร */
-      }
-    }catch(e){console.warn('[SSE] put parse error',e);}
-  });
-
-  ES.addEventListener('patch',function(evt){
-    /* patch = แก้บางส่วน → ดึงข้อมูลใหม่ทั้งหมดทันที */
-    console.log('[SSE] patch received → poll');
-    fbPoll();
-  });
-
-  ES.addEventListener('cancel',function(){
-    console.warn('[SSE] cancelled by server → poll');
-    if(ES){try{ES.close();}catch(e){}ES=null;}
-    fbSync();
-  });
-
-  ES.onopen=function(){
-    RT_FAIL=0;
-    ssync('rt','⚡ Realtime');
-    console.log('[SSE] connected ✓');
-  };
-
-  ES.onerror=function(e){
-    RT_FAIL++;
-    console.warn('[SSE] error #'+RT_FAIL,e);
-    /* readyState 2 = CLOSED, browser จะ reconnect อัตโนมัติถ้า 0/1 */
-    if(RT_FAIL>=5){
-      try{ES.close();}catch(err){}ES=null;
-      RT_FAIL=0;
-      console.warn('[SSE] max retries → polling fallback');
-      fbSync();
-    }
-  };
-}
-
-/* ─── Polling: fallback และ reconcile ───────────────────── */
-function fbPoll(){
+function doPoll(){
+  if(POLL_BUSY)return;
+  POLL_BUSY=true;
   var url=FBU.replace(/\/+$/,'')+'/'+DBK+'.json?nc='+Date.now();
   fetch(url)
     .then(function(r){
@@ -726,47 +640,34 @@ function fbPoll(){
       return r.json();
     })
     .then(function(d){
-      applyServerData(d);
+      POLL_BUSY=false;
+      applyData(d);
     })
     .catch(function(e){
-      console.warn('[Poll] error',e.message);
-      ssync('se','เชื่อมต่อขาด — กำลังลองใหม่...');
-      setTimeout(function(){
-        if(ES&&ES.readyState===1){ssync('rt','⚡ Realtime');}
-        else{ssync('','พร้อมใช้งาน');}
-      },4000);
+      POLL_BUSY=false;
+      console.warn('[Poll] '+e.message);
+      ssync('se','เชื่อมต่อขาด...');
+      setTimeout(function(){ssync('rt','⚡ Realtime');},3000);
     });
 }
 
-/* ─── fbSync: polling-only mode (SSE fallback) ──────────── */
-function fbSync(){
-  if(!fbOK())return;
-  if(ST)clearInterval(ST);
-  ssync('sy','กำลังเชื่อมต่อ...');
-  /* poll ทันที 1 ครั้ง แล้ว interval */
-  fbPoll();
-  ST=setInterval(fbPoll,3000);
-}
-
-/* ─── fbStartRT: จุดเริ่มต้น — SSE + reconcile interval ── */
 function fbStartRT(){
   if(!fbOK())return;
-  /* ปิด connection เก่า */
   fbStop();
-  /* เริ่ม SSE */
-  fbSSE();
-  /* Reconcile poll ทุก 8 วิ เพื่อ guarantee ว่าข้อมูลตรง
-     แม้ SSE จะทำงานอยู่ (ป้องกัน edge case) */
-  ST=setInterval(function(){
-    fbPoll();
-  },8000);
+  /* poll ทันที 1 ครั้ง แล้ว interval ทุก 2 วิ */
+  doPoll();
+  POLL_IV=setInterval(doPoll,2000);
+  ssync('rt','⚡ Realtime');
+  console.log('[RT] polling started 2s interval');
 }
 
 function fbStop(){
-  if(ST){clearInterval(ST);ST=null;}
-  if(ES){try{ES.close();}catch(e){}ES=null;}
-  RT_FAIL=0;
+  if(POLL_IV){clearInterval(POLL_IV);POLL_IV=null;}
+  POLL_BUSY=false;
+  SAVING=false; SAVE_PENDING=false;
 }
+
+
 
 /* ── LOCAL STORAGE ─────────────── */
 function lsL(){try{var r=localStorage.getItem(DBK);if(r){var d=JSON.parse(r);BK=d.BK||[];NI=d.NI||nxId();DX=d.DX||{};}else{BK=[];NI=1;}}catch(e){BK=[];NI=1;}}
@@ -780,7 +681,7 @@ function nxId(){
 function ssync(cls,txt){
   var b=document.getElementById('SBAR'),t=document.getElementById('STX');
   if(!b||!t)return;
-  b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':cls==='rt'?' rt':'');
+  b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':cls==='rt'?' rt':cls==='ok'?' ok':'');
   t.textContent=txt;
 }
 
@@ -826,15 +727,14 @@ function doLogin(){
   /* โหลดข้อมูลจาก Firebase ก่อนเข้าแอป */
   fbLoad(function(){
     scr('A');
-    ssync('','พร้อมใช้งาน');
-    fbStartRT(); /* เริ่ม Realtime sync (SSE + fallback) */
+    ssync('rt','⚡ Realtime');
+    fbStartRT();
     rEO('','DO',false);
     rV();
   });
 }
 function doLogout(){
   fbStop();
-  /* FIX: reset state ทั้งหมดตอน logout ป้องกันข้อมูลซ้ำซ้อน */
   BK=[];NI=1;DX={};LH='';
   CE=null;CR='user';EID=null;DID=null;
   SAVING=false;SAVE_PENDING=false;SUBMITTING=false;
@@ -904,7 +804,7 @@ function subB(){
   var newRec={id:newId,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()};
   BK.push(newRec);
   console.log('[subB] New booking id='+newId+' total BK='+BK.length);
-  LH=''; LAST_T=0; /* บังคับให้ทุกอุปกรณ์รับข้อมูลใหม่ */
+  LH='';
   fbSave();
   tt('ส่งคำขอจองเรียบร้อย ✓','ok');
   clrF();
@@ -969,7 +869,7 @@ function svEd(){
   b.rv=document.getElementById('MRV').value;b.ua=Date.now();
   console.log('[svEd] Saving edit for id='+EID+' total BK='+BK.length);
   /* FIX: reset LH เพื่อให้ fbSync รู้ว่ามีการแก้ไข */
-  LH=''; LAST_T=0;
+  LH='';
   cEd();fbSave();rA();rM();rEx();tt('บันทึกเรียบร้อย ✓','ok');
 }
 function askD(id){
@@ -991,14 +891,8 @@ function doDel(){
   fbSave();
   rA(); rM(); rEx();
   tt('ลบรายการเรียบร้อย','ok');
-  /* รอให้ SAVING หยุดจริงๆ แล้วค่อย restart realtime sync */
-  var waitSync=setInterval(function(){
-    if(!SAVING){
-      clearInterval(waitSync);
-      fbStartRT();
-    }
-  },500);
-  setTimeout(function(){clearInterval(waitSync);if(!ST)fbStartRT();},20000);
+  /* restart polling หลัง delete */
+  setTimeout(function(){fbStartRT();},1000);
 }
 
 /* ── EXPORT ───────────────────── */
