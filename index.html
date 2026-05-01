@@ -457,7 +457,7 @@ function fbLoad(done){
   var t=setTimeout(function(){if(fired)return;fired=true;lsL();ssync('se','ออฟไลน์');done();},5000);
   fetch(FBU+'/'+DBK+'.json?nc='+Date.now())
     .then(function(r){return r.json();})
-    .then(function(d){if(fired)return;fired=true;clearTimeout(t);if(d&&d.BK){BK=d.BK;NI=d.NI||nxId();lsS();}else{BK=[];NI=1;}ssync('','พร้อมใช้งาน');done();})
+    .then(function(d){if(fired)return;fired=true;clearTimeout(t);if(d&&d.BK){if(d.DX)Object.assign(DX,d.DX);BK=d.BK.filter(function(b){return !DX[b.id];});NI=nxId();lsS();}else{BK=[];NI=1;}ssync('','พร้อมใช้งาน');done();})
     .catch(function(){if(fired)return;fired=true;clearTimeout(t);lsL();ssync('se','ออฟไลน์');done();});
 }
 function fbSave(){
@@ -520,8 +520,9 @@ function doLogin(){
   document.getElementById('NAL').style.display=ia?'block':'none';
   ['N2','N3','B2','B3'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
   var sb=document.getElementById('SBAR');if(sb)sb.style.display='flex';
-  ssync('','พร้อมใช้งาน');
-  fbSync();
+  ssync('sy','กำลังโหลดข้อมูล...');
+  LH=''; // reset hash ทุกครั้งที่ login ใหม่ เพื่อให้ sync รับข้อมูลล่าสุดจาก Firebase เสมอ
+  fbLoad(function(){ fbSync(); rV(); }); // โหลด Firebase ก่อน แล้วค่อย sync และ render
   rEO('','DO',false);
 }
 function doLogout(){
@@ -581,6 +582,7 @@ function subB(){
   var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
   if(!d||!b||!ci||!co){tt('กรุณากรอกข้อมูลให้ครบถ้วน','er');return;}
   var n=nts(ci,co);if(n<=0){tt('Check-out ต้องหลัง Check-in','er');return;}
+  NI=nxId(); // คำนวณ ID ใหม่จากข้อมูลปัจจุบันทุกครั้ง ป้องกัน ID ซ้ำกัน
   BK.push({id:NI++,eid:CE.id,dt:d,br:b,ci:ci,co:co,n:n,nt:document.getElementById('FT').value,st:'รอดำเนินการ',ht:'',pr:0,tot:0,rv:'',ca:Date.now()});
   fbSave();tt('ส่งคำขอจองเรียบร้อย ✓','ok');clrF();
 }
