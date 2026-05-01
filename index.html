@@ -1102,7 +1102,9 @@ function rM(){
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   RENDER ADMIN — ใช้ data-index แทน onclick string เพื่อความปลอดภัย
+   RENDER ADMIN
+   ใช้ onclick="opEd(N)" ตรงๆ — ทำงานได้ทุก environment
+   รวมถึง GitHub Pages, Android, iOS, Windows
    ══════════════════════════════════════════════════════════════════ */
 function clrR(){
   document.getElementById('FF').value='';
@@ -1126,14 +1128,12 @@ function rA(){
 
   var tot=BK.reduce(function(a,b){return a+(b.tot||0);},0);
 
-  /* Stats */
   document.getElementById('AST').innerHTML=
     '<div class="st"><div class="stn">'+BK.length+'</div><div class="stl">ทั้งหมด</div></div>'+
-    '<div class="st"><div class="stn" style="color:#d97706">'+BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+'</div><div class="stl">รอดำเนินการ</div></div>'+
+    '<div class="st"><div class="stn" style="color:#d97706">'+
+      BK.filter(function(b){return b.st==='รอดำเนินการ'||!b.st;}).length+
+    '</div><div class="stl">รอดำเนินการ</div></div>'+
     '<div class="st"><div class="stn" style="color:#059669">'+tot.toLocaleString()+'</div><div class="stl">งบรวม ฿</div></div>';
-
-  /* ใช้ data-idx เก็บ index ใน BK[] แทนการส่ง string/uid ผ่าน onclick */
-  /* วิธีนี้ปลอดภัย 100% ไม่มีปัญหา type mismatch หรือ escaping */
 
   var tableRows='';
   var cardItems='';
@@ -1141,8 +1141,13 @@ function rA(){
   for(var i=0;i<d.length;i++){
     var b=d[i];
     var e=ge(b.eid)||{};
-    /* หา index จริงใน BK[] */
-    var realIdx=BK.indexOf(b);
+    var idx=BK.indexOf(b); /* index จริงใน BK[] */
+
+    /* onclick ส่ง integer ตรงๆ — ไม่มี string escaping ไม่มี event delegation */
+    var eBtn='<button onclick="opEd('+idx+')" class="btn bo bs" style="font-size:11px">✏️ แก้ไข</button>';
+    var dBtn='<button onclick="askD('+idx+')" class="btn bd bs" style="font-size:11px">🗑 ลบ</button>';
+    var eBtnC='<button onclick="opEd('+idx+')" class="btn bo" style="font-size:13px;flex:1">✏️ แก้ไข</button>';
+    var dBtnC='<button onclick="askD('+idx+')" class="btn bd" style="font-size:13px;flex:1">🗑 ลบ</button>';
 
     tableRows+=
       '<tr>'+
@@ -1156,20 +1161,16 @@ function rA(){
       '<td>'+stB(b.st)+'</td>'+
       '<td>'+(b.ht||'-')+'</td>'+
       '<td>'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</td>'+
-      '<td>'+
-        '<div style="display:flex;gap:5px">'+
-          '<button class="btn bo bs adm-edit" data-idx="'+realIdx+'" style="font-size:11px">✏️ แก้ไข</button>'+
-          '<button class="btn bd bs adm-del" data-idx="'+realIdx+'" style="font-size:11px">🗑 ลบ</button>'+
-        '</div>'+
-      '</td>'+
+      '<td><div style="display:flex;gap:5px">'+eBtn+dBtn+'</div></td>'+
       '</tr>';
 
     cardItems+=
       '<div class="bc">'+
       '<div class="bch">'+
-        '<div><div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div>'+
-        '<div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div></div>'+
-        stB(b.st)+
+        '<div>'+
+          '<div class="bcn">'+(e.nm||'-')+' ('+(e.nk||'')+')</div>'+
+          '<div class="bcp">'+(e.ps||'')+' — R'+(e.r||'-')+'</div>'+
+        '</div>'+stB(b.st)+
       '</div>'+
       '<div class="bcr"><span class="bcl">สาขา</span><span class="bcv">'+b.br+'</span></div>'+
       '<div class="bcr"><span class="bcl">Check-in</span><span class="bcv">'+fD(b.ci)+'</span></div>'+
@@ -1177,65 +1178,14 @@ function rA(){
       '<div class="bcr"><span class="bcl">ที่พัก</span><span class="bcv">'+(b.ht||'-')+'</span></div>'+
       '<div class="bcr"><span class="bcl">ราคารวม</span><span class="bcv">'+(b.tot?b.tot.toLocaleString()+' ฿':'-')+'</span></div>'+
       (b.rv?'<div class="bcr"><span class="bcl">รีวิว</span><span class="bcv">'+b.rv+'</span></div>':'')+
-      '<div class="bca">'+
-        '<button class="btn bo adm-edit" data-idx="'+realIdx+'" style="font-size:13px;flex:1">✏️ แก้ไข</button>'+
-        '<button class="btn bd adm-del" data-idx="'+realIdx+'" style="font-size:13px;flex:1">🗑 ลบ</button>'+
-      '</div>'+
+      '<div class="bca">'+eBtnC+dBtnC+'</div>'+
       '</div>';
   }
 
-  var emptyTable='<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
-  var emptyCard='<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
-
-  document.getElementById('ATB').innerHTML=d.length?tableRows:emptyTable;
-  document.getElementById('ACA').innerHTML=d.length?cardItems:emptyCard;
-
-  /* ผูก event listener แบบ delegation บน parent — ทำงานได้ทุก browser */
-  bindAdminButtons();
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   EVENT DELEGATION — ผูก click ที่ parent เดียว ไม่ใช้ inline onclick
-   ทำงานได้ทุก platform รวมถึง Android WebView เก่า
-   ══════════════════════════════════════════════════════════════════ */
-var _adminBound=false;
-function bindAdminButtons(){
-  /* ผูกครั้งเดียวที่ #V2 container — ใช้ event delegation */
-  if(_adminBound)return;
-  _adminBound=true;
-
-  var v2=document.getElementById('V2');
-  if(!v2)return;
-
-  function handleClick(e){
-    /* หา button ที่ถูกกด (อาจกด SVG หรือ text ข้างใน) */
-    var btn=e.target;
-    while(btn&&btn!==v2){
-      if(btn.classList&&(btn.classList.contains('adm-edit')||btn.classList.contains('adm-del')))break;
-      btn=btn.parentNode;
-    }
-    if(!btn||btn===v2)return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    var idx=parseInt(btn.getAttribute('data-idx'),10);
-    if(isNaN(idx)||idx<0||idx>=BK.length)return;
-
-    if(btn.classList.contains('adm-edit')){
-      opEd(idx);
-    } else if(btn.classList.contains('adm-del')){
-      askD(idx);
-    }
-  }
-
-  /* ผูกทั้ง click และ touchend เพื่อรองรับ Mobile */
-  v2.addEventListener('click',handleClick);
-  v2.addEventListener('touchend',function(e){
-    /* ป้องกัน double-fire บน Android */
-    if(e.cancelable)e.preventDefault();
-    handleClick(e);
-  },{passive:false});
+  document.getElementById('ATB').innerHTML=d.length?tableRows:
+    '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายการ</td></tr>';
+  document.getElementById('ACA').innerHTML=d.length?cardItems:
+    '<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายการ</div>';
 }
 
 /* ══════════════════════════════════════════════════════════════════
