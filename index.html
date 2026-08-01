@@ -314,6 +314,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="nl" id="NAL" style="display:none">Admin</div>
       <div class="ni" id="N2" style="display:none" onclick="gv(2);cSB()"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>จัดการทั้งหมด</div>
       <div class="ni" id="N3" style="display:none" onclick="gv(3);cSB()"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Export ข้อมูล</div>
+      <div class="ni" id="N4" style="display:none" onclick="gv(4);cSB()"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>จัดการรายชื่อ</div>
     </div>
     <div class="sf">
       <div class="su"><div class="sav" id="SAV">-</div><div><div class="sn" id="SNM">-</div><div class="sr" id="SRO">-</div></div></div>
@@ -349,7 +350,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div class="stitle">ข้อมูลการเดินทาง</div>
           <div class="fg">
             <div class="fi fw"><label>วันที่ต้องการจอง</label><input type="date" id="FD"></div>
-            <div class="fi fw"><label>สาขาที่จะไป</label><input type="text" id="FB" placeholder="เช่น ST45 กำแพงเพชร"></div>
+            <div class="fi fw"><label>สาขาที่จะไป</label>
+              <div class="dw" id="BW">
+                <input class="di" id="BV" readonly placeholder="🔍  ค้นหาเลข / ชื่อสาขา..." onclick="tBD(event)" ontouchend="tBD(event)">
+                <input type="hidden" id="FB">
+                <div class="dl" id="BL"><div class="dq"><input type="text" id="BQ" placeholder="พิมพ์เลขหรือชื่อสาขา..." oninput="fBr()" autocomplete="off" inputmode="text"></div><div id="BO"></div></div>
+              </div>
+            </div>
             <div class="fi"><label>Check-in</label><input type="date" id="FCI" onchange="cN()"></div>
             <div class="fi"><label>Check-out</label><input type="date" id="FCO" onchange="cN()"></div>
             <div class="fi fw"><label>จำนวนคืน (อัตโนมัติ)</label>
@@ -406,6 +413,21 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
 
+      <!-- V4: จัดการรายชื่อพนักงาน (Admin) -->
+      <div class="vw" id="V4">
+        <div class="fc">
+          <div style="display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:space-between;justify-content:space-between;gap:8px;-webkit-flex-wrap:wrap;flex-wrap:wrap">
+            <div><div class="stitle" style="margin-bottom:2px">รายชื่อพนักงานทั้งหมด</div><div style="font-size:11px;color:var(--M)" id="EMPCNT">-</div></div>
+            <button class="btn bp bs" onclick="openEmpAdd()"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>เพิ่มรายชื่อใหม่</button>
+          </div>
+        </div>
+        <div class="flt">
+          <div class="flr"><input type="text" id="EMPQ" placeholder="🔍 ค้นหาชื่อ / ชื่อเล่น / ตำแหน่ง..." oninput="rEmp()" style="flex:2"></div>
+        </div>
+        <div class="bcs" id="EMPCA"></div>
+        <div class="fc" style="padding:0;overflow:hidden"><div class="tw"><table class="bt"><thead><tr><th>R</th><th>ชื่อพนักงาน</th><th>ชื่อเล่น</th><th>ตำแหน่ง</th><th>จัดการ</th></tr></thead><tbody id="EMPTB"></tbody></table></div></div>
+      </div>
+
     </div>
   </div>
   <!-- BOTTOM NAV -->
@@ -414,6 +436,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="bni-i" id="B1" onclick="gv(1)"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>รายการฉัน</div>
     <div class="bni-i" id="B2" style="display:none" onclick="gv(2)"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>จัดการ</div>
     <div class="bni-i" id="B3" style="display:none" onclick="gv(3)"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>Export</div>
+    <div class="bni-i" id="B4" style="display:none" onclick="gv(4)"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>รายชื่อ</div>
   </div></div>
 </div>
 
@@ -428,7 +451,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="fg">
           <div class="fi fw"><label>ชื่อพนักงาน</label><div class="dw" id="MDW"><input class="di" id="MDV" readonly onclick="tMDD(event)" ontouchend="tMDD(event)" placeholder="เลือกพนักงาน..."><div class="dl" id="MDL"><div class="dq"><input type="text" id="MDQ" placeholder="ค้นหา..." oninput="fMEmp()" autocomplete="off"></div><div id="MDO"></div></div></div></div>
           <div class="fi fw"><label>วันที่จอง</label><input type="date" id="MFD"></div>
-          <div class="fi fw"><label>สาขา</label><input type="text" id="MFB"></div>
+          <div class="fi fw"><label>สาขา</label>
+            <div class="dw" id="MBW">
+              <input class="di" id="MBV" readonly placeholder="🔍  ค้นหาเลข / ชื่อสาขา..." onclick="tMBD(event)" ontouchend="tMBD(event)">
+              <input type="hidden" id="MFB">
+              <div class="dl" id="MBL"><div class="dq"><input type="text" id="MBQ" placeholder="พิมพ์เลขหรือชื่อสาขา..." oninput="fMBr()" autocomplete="off" inputmode="text"></div><div id="MBO"></div></div>
+            </div>
+          </div>
           <div class="fi"><label>Check-in</label><input type="date" id="MCI" onchange="mCN()"></div>
           <div class="fi"><label>Check-out</label><input type="date" id="MCO" onchange="mCN()"></div>
           <div class="fi fw"><label>จำนวนคืน</label><div class="nb" id="MN" style="font-size:12px;padding:8px 14px">—</div></div>
@@ -469,6 +498,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <div class="toast" id="TT"></div>
+
+<!-- EMPLOYEE ADD/EDIT MODAL (Admin) -->
+<div class="mb" id="EMPM" style="display:none">
+  <div class="mo">
+    <div class="mh2"></div>
+    <div class="mh"><h3 id="EMPMH">👤 เพิ่มรายชื่อใหม่</h3><button class="mx" onclick="closeEmp()" style="touch-action:manipulation">×</button></div>
+    <div class="mby">
+      <div class="ms">
+        <div class="mst">ข้อมูลพนักงาน</div>
+        <div class="fg">
+          <div class="fi fw"><label>ชื่อ-นามสกุล</label><input type="text" id="EMPNM" placeholder="เช่น คุณ สมชาย ใจดี"></div>
+          <div class="fi"><label>ชื่อเล่น</label><input type="text" id="EMPNK" placeholder="เช่น ชาย"></div>
+          <div class="fi"><label>Regional</label><select id="EMPR"><option value="1">Regional 1</option><option value="2">Regional 2</option><option value="3">Regional 3</option><option value="4">Regional 4</option></select></div>
+          <div class="fi fw"><label>ตำแหน่ง</label><input type="text" id="EMPPS" placeholder="เช่น SOA 1 / Inven 1 / RSOA 1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <div style="-webkit-flex:1;flex:1"></div>
+      <button class="btn bo bs" onclick="closeEmp()" style="touch-action:manipulation">ยกเลิก</button>
+      <button class="btn bp bs" onclick="saveEmp()" style="touch-action:manipulation"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 /* =====================================================
@@ -479,7 +533,7 @@ var FBU='https://hotelproject-d12bf-default-rtdb.asia-southeast1.firebasedatabas
 /* ===================================================== */
 var DBK='hbv4';
 var US={soa:{pw:'makroho',role:'user',lbl:'SOA',disp:'SOA (พนักงาน)'},inv:{pw:'makroho',role:'user',lbl:'INV',disp:'Inventory (พนักงาน)'},admin:{pw:'adminho',role:'admin',lbl:'AD',disp:'Admin (ผู้ดูแล)'}};
-var EM=[
+var EM_SEED=[
 {id:1,nm:'คุณ วัชระ กลางกระโทก',r:1,nk:'ตุ้ม',ps:'RSOA 1'},
 {id:2,nm:'คุณ พิชิต คันธาเวช',r:1,nk:'เอ',ps:'SOA 1'},
 {id:3,nm:'คุณ ธีระพงษ์ อินจุ้มสาย',r:1,nk:'หนุ่ย',ps:'SOA 2'},
@@ -517,7 +571,180 @@ var EM=[
 {id:35,nm:'คุณ บุญนำพา ไหมชุม',r:4,nk:'ผึ้ง',ps:'Inven 14'},
 {id:36,nm:'คุณ สุวิทย์ เซ่งบุญตั๋น',r:4,nk:'ไก่',ps:'Inven 15'}
 ];
+/* EM = รายชื่อที่ใช้งานจริง (แก้ไข/เพิ่มได้ + sync Firebase) เริ่มจาก seed ก่อน */
+var EM=EM_SEED.map(function(e){return{id:e.id,nm:e.nm,r:e.r,nk:e.nk,ps:e.ps};});
+var EMK='emp_v1'; /* path บน Firebase สำหรับรายชื่อพนักงาน */
+
+var ST_LIST=[
+{n:1,s:'ลาดพร้าว'},
+{n:2,s:'แจ้งวัฒนะ'},
+{n:3,s:'ศรีนครินทร์'},
+{n:4,s:'บางบอน'},
+{n:5,s:'ชลบุรี'},
+{n:6,s:'เชียงใหม่'},
+{n:7,s:'นครราชสีมา'},
+{n:8,s:'รังสิต'},
+{n:9,s:'หาดใหญ่'},
+{n:10,s:'อุดรธานี'},
+{n:11,s:'พิษณุโลก'},
+{n:12,s:'ขอนแก่น'},
+{n:13,s:'สุราษฎร์ธานี'},
+{n:14,s:'อุบลราชธานี'},
+{n:15,s:'ระยอง'},
+{n:16,s:'นครสวรรค์'},
+{n:17,s:'จรัญสนิทวงศ์'},
+{n:18,s:'สาทร'},
+{n:19,s:'นครปฐม'},
+{n:20,s:'สุรินทร์'},
+{n:21,s:'สามเสน'},
+{n:22,s:'นครศรีธรรมราช'},
+{n:23,s:'เชียงราย'},
+{n:24,s:'สกลนคร'},
+{n:25,s:'สุพรรณบุรี'},
+{n:26,s:'จันทบุรี'},
+{n:27,s:'ภูเก็ต'},
+{n:28,s:'ร้อยเอ็ด'},
+{n:29,s:'ตรัง'},
+{n:30,s:'สระแก้ว'},
+{n:31,s:'เกาะสมุย'},
+{n:32,s:'บุรีรัมย์'},
+{n:33,s:'ศรีสะเกษ'},
+{n:34,s:'ลำพูน'},
+{n:35,s:'กระบี่'},
+{n:36,s:'เพชรบุรี'},
+{n:37,s:'ชัยภูมิ'},
+{n:38,s:'สระบุรี'},
+{n:39,s:'ปราณบุรี'},
+{n:40,s:'ฉะเชิงเทรา'},
+{n:41,s:'เชียงใหม่2'},
+{n:42,s:'รามอินทรา'},
+{n:43,s:'ชุมพร'},
+{n:44,s:'พัทยา'},
+{n:45,s:'กำแพงเพชร'},
+{n:46,s:'กาญจนบุรี'},
+{n:47,s:'ลพบุรี'},
+{n:48,s:'หนองคาย'},
+{n:49,s:'ราชบุรี'},
+{n:50,s:'แม่ริม'},
+{n:51,s:'อยุธยา'},
+{n:52,s:'ลำปาง'},
+{n:53,s:'หัวหิน'},
+{n:54,s:'คลองหลวง'},
+{n:55,s:'เลย'},
+{n:56,s:'เพชรบูรณ์'},
+{n:57,s:'บางพลี'},
+{n:58,s:'มุกดาหาร'},
+{n:59,s:'สตูล'},
+{n:60,s:'ตราด'},
+{n:61,s:'ชุมแพ'},
+{n:62,s:'ราไวย์'},
+{n:63,s:'นครพนม'},
+{n:64,s:'เกาะพะงัน'},
+{n:65,s:'บึงกาฬ'},
+{n:66,s:'พัทยาเหนือ'},
+{n:67,s:'แม่สาย'},
+{n:68,s:'ศาลายา'},
+{n:69,s:'พัทลุง'},
+{n:70,s:'สุโขทัย'},
+{n:71,s:'ป่าตอง'},
+{n:72,s:'สมุทรสาคร'},
+{n:73,s:'แม่สอด'},
+{n:74,s:'ปากช่อง'},
+{n:75,s:'ถลาง'},
+{n:76,s:'ระนอง'},
+{n:77,s:'ละไม'},
+{n:78,s:'กัลปพฤกษ์'},
+{n:79,s:'ยโสธร'},
+{n:80,s:'มหาสารคาม'},
+{n:81,s:'ฝาง'},
+{n:82,s:'นครนายก'},
+{n:83,s:'นครอินทร์'},
+{n:84,s:'บ้านเพ'},
+{n:85,s:'ทุ่งสง'},
+{n:86,s:'ศรีนครินทร์2'},
+{n:87,s:'พะเยา'},
+{n:89,s:'พิษณุโลก2'},
+{n:96,s:'ทาวน์อินทาวน์'},
+{n:100,s:'แพร่'},
+{n:101,s:'เกาะช้าง'},
+{n:102,s:'นครราชสีมา2'},
+{n:103,s:'น่าน'},
+{n:104,s:'อ่าวนาง'},
+{n:105,s:'กะรน'},
+{n:106,s:'วารินชำราบ'},
+{n:107,s:'หนองบัวลำภู'},
+{n:108,s:'หนองจอก'},
+{n:109,s:'แหลมฉบัง'},
+{n:110,s:'ประจวบคีรีขันธ์'},
+{n:111,s:'เพชรเกษม'},
+{n:112,s:'บางปู'},
+{n:113,s:'วังหิน'},
+{n:114,s:'สิงห์บุรี'},
+{n:115,s:'บางบัวทอง'},
+{n:116,s:'กาฬสินธุ์'},
+{n:117,s:'อุดมสุข'},
+{n:118,s:'รามคำแหง(สัมมากร)'},
+{n:119,s:'พิจิตร'},
+{n:120,s:'ปทุมธานี'},
+{n:121,s:'บดินทรเดชา'},
+{n:122,s:'ประชาอุทิศ'},
+{n:123,s:'สุขุมวิท71'},
+{n:124,s:'นวมินทร์70'},
+{n:125,s:'ชะอำ'},
+{n:126,s:'อ่อนนุช'},
+{n:127,s:'สุขสวัสดิ์'},
+{n:128,s:'กบินทร์บุรี'},
+{n:129,s:'ลาดกระบัง'},
+{n:130,s:'นาทองเจริญ'},
+{n:131,s:'บ่อวิน'},
+{n:132,s:'สัตหีบ'},
+{n:133,s:'รามคำแหง24'},
+{n:134,s:'อมตะนคร'},
+{n:135,s:'บางคอแหลม'},
+{n:136,s:'ขอนแก่น2'},
+{n:137,s:'วงศกร2'},
+{n:138,s:'เหม่งจ๋าย'},
+{n:139,s:'สุขุมวิท22'},
+{n:140,s:'ถนนจันทน์'},
+{n:141,s:'ลำลูกกา'},
+{n:142,s:'แพรกษา'},
+{n:143,s:'ประดิษฐ์มนูธรรม'},
+{n:144,s:'ตลาดรุ่งโรจน์(คลอง4)'},
+{n:145,s:'พงษ์เพชร'},
+{n:146,s:'อุตรดิตถ์'},
+{n:147,s:'เมืองทอง'},
+{n:148,s:'เลียบคลอง2'},
+{n:149,s:'อ้อมน้อย'},
+{n:150,s:'สนามบินน้ำ'},
+{n:151,s:'เทพรักษ์'},
+{n:152,s:'สมุทรสงคราม'},
+{n:153,s:'เวียงสระ'},
+{n:154,s:'ปราจีนบุรี'},
+{n:155,s:'ปิ่นเกล้า'},
+{n:156,s:'สมุทรปราการ'},
+{n:157,s:'นครราชสีมา3 (เซฟวัน)'},
+{n:158,s:'นครสวรรค์ 2 (พรหมนิมิต)'},
+{n:159,s:'อุดรธานี 2 (บ้านเลื่อม)'},
+{n:160,s:'มหาชัย'},
+{n:161,s:'ขอนแก่น3 (บ้านโนนม่วง)'},
+{n:162,s:'อมตะนคร 2'},
+{n:163,s:'สงขลา'},
+{n:164,s:'ชัยนาท'},
+{n:165,s:'ถนนศรีอยุธยา'},
+{n:166,s:'ราไวย์ 2'},
+{n:167,s:'เชียงใหม่ (จอมทอง)'},
+{n:168,s:'บ้านบึง (ชลบุรี)'},
+{n:169,s:'พังงา'},
+{n:170,s:'อำนาจเจริญ'},
+{n:171,s:'จอหอ (นครราชสีมา)'},
+{n:172,s:'บ้านไผ่'},
+{n:175,s:'แฮปปี้แทท (ฟอเรสเทียส์ - บางนา)'},
+{n:301,s:'พระราม4'},
+{n:303,s:'ศิริมังคลาจารย์'}
+];
 var BK=[],NI=1,CE=null,CR='user',EID=null,DID=null,DDO=false,MO=false,MEI=null,CV=0,ST=null,LH='',DX={};
+var BDO=false,MBDO=false; /* สถานะเปิด/ปิด dropdown สาขา (V0 + Edit modal) */
+var EEID=null; /* id พนักงานที่กำลังแก้ไข (null = เพิ่มใหม่) */
 /* Concurrent-safe sync state */
 var ES=null,IS_SAVING=false,SAVE_TS=0,OQ=[],IS_ONLINE=true;
 
@@ -985,6 +1212,49 @@ function fbStop(){
 /* ── LOCAL STORAGE ─────────────── */
 function lsL(){try{var r=localStorage.getItem(DBK);if(r){var d=JSON.parse(r);BK=d.BK||[];NI=d.NI||nxId();DX=d.DX||{};}else{BK=[];NI=1;}}catch(e){BK=[];NI=1;}loadQueue();}
 function lsS(){try{localStorage.setItem(DBK,JSON.stringify({BK:BK,NI:NI,t:Date.now(),DX:DX}));}catch(e){}}
+
+/* ══════════════════════════════════════════════════════════════════
+   EMPLOYEE LIST — โหลด/บันทึก รายชื่อพนักงาน (sync Firebase + localStorage)
+   ══════════════════════════════════════════════════════════════════ */
+function emLS(){try{localStorage.setItem(DBK+'_'+EMK,JSON.stringify({EM:EM,t:Date.now()}));}catch(e){}}
+function emLoadLS(){try{var r=localStorage.getItem(DBK+'_'+EMK);if(r){var d=JSON.parse(r);if(d.EM&&d.EM.length)EM=d.EM;}}catch(e){}}
+/* เรียงลำดับตาม Regional แล้วตาม id */
+function emSort(){EM.sort(function(a,b){return (a.r-b.r)||(a.id-b.id);});}
+function emNextId(){return EM.length?Math.max.apply(null,EM.map(function(e){return e.id;}))+1:1;}
+/* โหลดรายชื่อจาก Firebase — ถ้าไม่มีเลย ให้ seed ค่าเริ่มต้นขึ้นไป */
+function emLoad(done){
+  emLoadLS();
+  if(!fbOK()){emSort();if(done)done();return;}
+  fetch(FBU+EMK+'.json?nc='+Date.now(),{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&typeof d==='object'){
+        var arr=Object.keys(d).map(function(k){return d[k];}).filter(function(x){return x&&x.nm;});
+        if(arr.length){EM=arr;emSort();emLS();}
+        else{ emSeedToFB(); }
+      }else{
+        emSeedToFB(); /* ยังไม่มีข้อมูลบน Firebase → อัปโหลด seed */
+      }
+      if(done)done();
+    })
+    .catch(function(){emSort();if(done)done();});
+}
+/* อัปโหลดรายชื่อเริ่มต้นขึ้น Firebase ครั้งแรก (key = e<id>) */
+function emSeedToFB(){
+  if(!fbOK())return;
+  var obj={};EM.forEach(function(e){obj['e'+e.id]=e;});
+  fetch(FBU+EMK+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)})
+    .then(function(){emLS();}).catch(function(){});
+}
+/* บันทึกพนักงาน 1 คน (เพิ่มหรือแก้ไข) ขึ้น Firebase ที่ key e<id> */
+function emSaveOne(e,onOK,onFail){
+  emLS();
+  if(!fbOK()){if(onOK)onOK();return;}
+  fetch(FBU+EMK+'/e'+e.id+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(e)})
+    .then(function(r){if(!r.ok)throw 0;if(onOK)onOK();})
+    .catch(function(){if(onFail)onFail();});
+}
+
 function nxId(){return BK.length?Math.max.apply(null,BK.map(function(b){return b.id;}))+1:1;}
 function ssync(cls,txt){var b=document.getElementById('SBAR'),t=document.getElementById('STX');if(!b||!t)return;b.className='sbar'+(cls==='sy'?' sy':cls==='se'?' se':'');t.textContent=txt;}
 
@@ -1019,12 +1289,14 @@ function doLogin(){
   var rb=document.getElementById('RB');rb.className='rb '+(CR==='admin'?'ra':'ru');rb.textContent=CR==='admin'?'Admin':'SOA';
   var ia=CR==='admin';
   document.getElementById('NAL').style.display=ia?'block':'none';
-  ['N2','N3','B2','B3'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
+  ['N2','N3','N4','B2','B3','B4'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=ia?'flex':'none';});
   var sb=document.getElementById('SBAR');if(sb)sb.style.display='flex';
   ssync('sy','กำลังโหลดข้อมูล...');
   LH=''; // reset hash ทุกครั้งที่ login ใหม่ เพื่อให้ sync รับข้อมูลล่าสุดจาก Firebase เสมอ
+  emLoad(function(){ rEO('','DO',false); if(CV===4)rEmp(); }); /* โหลดรายชื่อพนักงานล่าสุด */
   fbLoad(function(){ fbSync(); rV(); }); // โหลด Firebase ก่อน แล้วค่อย sync และ render
   rEO('','DO',false);
+  document.getElementById('FD').value=todayISO(); /* default วันที่จอง = วันนี้ */
 }
 function doLogout(){
   fbStop();scr('N');
@@ -1046,6 +1318,8 @@ function tMDD(e){if(e&&e.preventDefault)e.preventDefault();MO=!MO;document.getEl
 function closeDropdowns(e){
   var w=document.getElementById('DW');if(w&&!w.contains(e.target)){DDO=false;document.getElementById('DL').classList.remove('op');}
   var m=document.getElementById('MDW');if(m&&!m.contains(e.target)){MO=false;document.getElementById('MDL').classList.remove('op');}
+  var bw=document.getElementById('BW');if(bw&&!bw.contains(e.target)){BDO=false;var bl=document.getElementById('BL');if(bl)bl.classList.remove('op');}
+  var mbw=document.getElementById('MBW');if(mbw&&!mbw.contains(e.target)){MBDO=false;var mbl=document.getElementById('MBL');if(mbl)mbl.classList.remove('op');}
 }
 document.addEventListener('click',closeDropdowns);
 document.addEventListener('touchend',function(e){closeDropdowns(e);},{passive:true});
@@ -1065,6 +1339,113 @@ function rEO(q,tid,isM){
 function pkE(id){CE=EM.find(function(e){return e.id===id;});document.getElementById('DV').value=CE.nm+' ('+CE.nk+') — R'+CE.r;DDO=false;document.getElementById('DL').classList.remove('op');document.getElementById('DQ').value='';}
 function pkM(id){MEI=id;var e=EM.find(function(x){return x.id===id;});document.getElementById('MDV').value=e.nm+' ('+e.nk+') — R'+e.r;MO=false;document.getElementById('MDL').classList.remove('op');document.getElementById('MDQ').value='';}
 
+/* ══════════════════════════════════════════════════════════════════
+   BRANCH DROPDOWN — เลือกสาขาแบบค้นหาได้ (เลข + ชื่อ)
+   เก็บค่าเป็น string 'ST<เลข> <ชื่อ>' ลงใน hidden input #FB / #MFB
+   เพื่อไม่กระทบส่วนที่ใช้ b.br เดิม
+   ══════════════════════════════════════════════════════════════════ */
+/* toggle dropdown สาขา (V0) */
+function tBD(e){if(e&&e.preventDefault)e.preventDefault();BDO=!BDO;document.getElementById('BL').classList.toggle('op',BDO);if(BDO){rBO('','BO');setTimeout(function(){document.getElementById('BQ').focus();},80);}}
+/* toggle dropdown สาขา (Edit modal) */
+function tMBD(e){if(e&&e.preventDefault)e.preventDefault();MBDO=!MBDO;document.getElementById('MBL').classList.toggle('op',MBDO);if(MBDO){rBO('','MBO');setTimeout(function(){document.getElementById('MBQ').focus();},80);}}
+function fBr(){rBO(document.getElementById('BQ').value.toLowerCase().trim(),'BO');}
+function fMBr(){rBO(document.getElementById('MBQ').value.toLowerCase().trim(),'MBO');}
+/* render รายการสาขา — ค้นได้ทั้งเลขและชื่อ, จำกัด 60 รายการแรกเพื่อความลื่น */
+function rBO(q,tid){
+  var isM=(tid==='MBO');
+  var list=ST_LIST.filter(function(s){
+    if(!q)return true;
+    return String(s.n).indexOf(q)>=0 || s.s.toLowerCase().indexOf(q)>=0;
+  });
+  var shown=list.slice(0,60);
+  var h=shown.map(function(s){
+    var lbl='ST'+s.n+' '+s.s;
+    var lblEsc=lbl.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return '<div class="do" onclick="'+(isM?'pkMBr':'pkBr')+'(&quot;'+lblEsc+'&quot;)"><div class="dn">ST'+s.n+'</div><div class="dp">'+s.s+'</div></div>';
+  }).join('');
+  if(list.length>60)h+='<div class="de">พิมพ์เพื่อค้นหาเพิ่มเติม ('+list.length+' สาขา)</div>';
+  var el=document.getElementById(tid);if(el)el.innerHTML=h||'<div class="de">ไม่พบสาขา</div>';
+}
+function pkBr(lbl){document.getElementById('FB').value=lbl;document.getElementById('BV').value=lbl;BDO=false;document.getElementById('BL').classList.remove('op');document.getElementById('BQ').value='';}
+function pkMBr(lbl){document.getElementById('MFB').value=lbl;document.getElementById('MBV').value=lbl;MBDO=false;document.getElementById('MBL').classList.remove('op');document.getElementById('MBQ').value='';}
+
+/* ══════════════════════════════════════════════════════════════════
+   EMPLOYEE MANAGEMENT (Admin) — เพิ่ม / แก้ไข รายชื่อพนักงาน
+   ══════════════════════════════════════════════════════════════════ */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+/* render ตาราง + การ์ด รายชื่อพนักงาน (กรองด้วยช่องค้นหา) */
+function rEmp(){
+  var q=(document.getElementById('EMPQ')?document.getElementById('EMPQ').value.toLowerCase().trim():'');
+  var list=EM.filter(function(e){
+    if(!q)return true;
+    return (e.nm||'').toLowerCase().indexOf(q)>=0||(e.nk||'').toLowerCase().indexOf(q)>=0||(e.ps||'').toLowerCase().indexOf(q)>=0||String(e.r).indexOf(q)>=0;
+  });
+  var cnt=document.getElementById('EMPCNT');if(cnt)cnt.textContent='ทั้งหมด '+EM.length+' คน'+(q?(' · พบ '+list.length+' คน'):'');
+  var tb=document.getElementById('EMPTB');
+  if(tb)tb.innerHTML=list.length?list.map(function(e){
+    return '<tr><td><span class="rb ru" style="padding:2px 8px">R'+e.r+'</span></td><td>'+esc(e.nm)+'</td><td>'+esc(e.nk)+'</td><td>'+esc(e.ps)+'</td>'+
+      '<td><button class="btn bo bs" onclick="openEmpEdit('+e.id+')" style="padding:5px 10px;min-height:30px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้ไข</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--M)">ไม่พบรายชื่อ</td></tr>';
+  var ca=document.getElementById('EMPCA');
+  if(ca)ca.innerHTML=list.length?list.map(function(e){
+    return '<div class="bc"><div class="bch"><div><div class="bcn">'+esc(e.nm)+'</div><div class="bcp">'+esc(e.nk)+' · '+esc(e.ps)+'</div></div><span class="rb ru">R'+e.r+'</span></div>'+
+      '<div class="bca"><button class="btn bo bs" onclick="openEmpEdit('+e.id+')">✏️ แก้ไข</button></div></div>';
+  }).join(''):'<div style="text-align:center;padding:24px;color:var(--M);background:white;border-radius:12px;border:1px solid var(--BD)">ไม่พบรายชื่อ</div>';
+}
+/* เปิด modal โหมดเพิ่มใหม่ */
+function openEmpAdd(){
+  EEID=null;
+  document.getElementById('EMPMH').textContent='👤 เพิ่มรายชื่อใหม่';
+  document.getElementById('EMPNM').value='';
+  document.getElementById('EMPNK').value='';
+  document.getElementById('EMPR').value='1';
+  document.getElementById('EMPPS').value='';
+  showModal('EMPM');
+}
+/* เปิด modal โหมดแก้ไข */
+function openEmpEdit(id){
+  var e=EM.find(function(x){return x.id===id;});if(!e)return;
+  EEID=id;
+  document.getElementById('EMPMH').textContent='✏️ แก้ไขรายชื่อ';
+  document.getElementById('EMPNM').value=e.nm||'';
+  document.getElementById('EMPNK').value=e.nk||'';
+  document.getElementById('EMPR').value=String(e.r||1);
+  document.getElementById('EMPPS').value=e.ps||'';
+  showModal('EMPM');
+}
+function closeEmp(){hideModal('EMPM');EEID=null;}
+/* บันทึก (เพิ่มหรือแก้ไข) */
+function saveEmp(){
+  var nm=document.getElementById('EMPNM').value.trim();
+  var nk=document.getElementById('EMPNK').value.trim();
+  var r=parseInt(document.getElementById('EMPR').value,10)||1;
+  var ps=document.getElementById('EMPPS').value.trim();
+  if(!nm){tt('กรุณากรอกชื่อ-นามสกุล','er');return;}
+  var rec;
+  if(EEID===null){
+    /* เพิ่มใหม่ */
+    rec={id:emNextId(),nm:nm,r:r,nk:nk,ps:ps};
+    EM.push(rec);
+  }else{
+    /* แก้ไข */
+    rec=EM.find(function(x){return x.id===EEID;});
+    if(!rec){tt('ไม่พบรายชื่อ','er');return;}
+    rec.nm=nm;rec.nk=nk;rec.r=r;rec.ps=ps;
+  }
+  emSort();
+  hideModal('EMPM');
+  ssync('sy','กำลังบันทึกรายชื่อ...');
+  emSaveOne(rec,
+    function(){ssync('','บันทึกแล้ว ✓');setTimeout(function(){ssync('','พร้อมใช้งาน');},1500);},
+    function(){ssync('se','บันทึกในเครื่องแล้ว — จะ sync เมื่อออนไลน์');}
+  );
+  EEID=null;
+  rEmp();               /* refresh ตารางรายชื่อ */
+  rEO('','DO',false);   /* refresh dropdown เลือกพนักงานหน้าจอง */
+  rV();                 /* refresh view ปัจจุบัน (เผื่อชื่อในรายการจองเปลี่ยน) */
+  tt('บันทึกรายชื่อเรียบร้อย ✓','ok');
+}
+
 /* ── NIGHTS ───────────────────── */
 function nts(a,b){if(!a||!b)return 0;var d=(new Date(b)-new Date(a))/86400000;return d>0?Math.round(d):0;}
 function cN(){
@@ -1080,7 +1461,9 @@ function mCN(){
 function mAT(){var b=findRec(EID);var n=nts(document.getElementById('MCI').value,document.getElementById('MCO').value)||(b?b.n:0);document.getElementById('MTO').value=(parseFloat(document.getElementById('MPR').value)||0)*n||'';}
 
 /* ── FORM ─────────────────────── */
-function clrF(){['FD','FB','FCI','FCO','FT'].forEach(function(id){document.getElementById(id).value='';});cN();}
+/* คืนค่าวันปัจจุบันในรูปแบบ YYYY-MM-DD (สำหรับ input type=date) ตาม local time */
+function todayISO(){var d=new Date();var m=String(d.getMonth()+1).padStart(2,'0');var day=String(d.getDate()).padStart(2,'0');return d.getFullYear()+'-'+m+'-'+day;}
+function clrF(){['FB','FCI','FCO','FT'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('FD').value=todayISO();var bv=document.getElementById('BV');if(bv)bv.value='';cN();}
 function subB(){
   if(!CE){tt('กรุณาเลือกชื่อพนักงานก่อน','er');return;}
   var d=document.getElementById('FD').value,b=document.getElementById('FB').value.trim(),ci=document.getElementById('FCI').value,co=document.getElementById('FCO').value;
@@ -1237,6 +1620,7 @@ function opEd(idx){
   document.getElementById('MDV').value=e.nm?(e.nm+' ('+e.nk+') — R'+e.r):'';
   document.getElementById('MFD').value=b.dt||'';
   document.getElementById('MFB').value=b.br||'';
+  document.getElementById('MBV').value=b.br||'';
   document.getElementById('MCI').value=b.ci||'';
   document.getElementById('MCO').value=b.co||'';
   document.getElementById('MNT').value=b.nt||'';
@@ -1347,9 +1731,9 @@ function exPen(){var p=BK.filter(function(b){return b.st==='รอดำเน�
 function rEx(){var tb=document.getElementById('ETB');if(!tb)return;tb.innerHTML=BK.slice(0,8).map(function(b){var e=ge(b.eid)||{};return'<tr><td>'+(e.nm||'-')+'</td><td>R'+(e.r||'-')+'</td><td>'+fX(b.dt)+'</td><td>'+b.br+'</td><td>'+fX(b.ci)+'</td><td>'+fX(b.co)+'</td><td>'+b.n+'</td><td>'+stB(b.st)+'</td><td>'+(b.ht||'-')+'</td><td>'+(b.tot?b.tot.toLocaleString():'-')+'</td></tr>';}).join('');}
 
 /* ── NAV ──────────────────────── */
-var VN=[['จองที่พัก','กรอกรายละเอียดการเดินทางและที่พัก'],['รายการของฉัน','ดูสถานะการจองทั้งหมด'],['จัดการทั้งหมด','แก้ไข / ลบ / อัปเดตรายการ'],['Export ข้อมูล','ดาวน์โหลดเป็นไฟล์ Excel']];
+var VN=[['จองที่พัก','กรอกรายละเอียดการเดินทางและที่พัก'],['รายการของฉัน','ดูสถานะการจองทั้งหมด'],['จัดการทั้งหมด','แก้ไข / ลบ / อัปเดตรายการ'],['Export ข้อมูล','ดาวน์โหลดเป็นไฟล์ Excel'],['จัดการรายชื่อ','เพิ่ม / แก้ไข ข้อมูลพนักงาน']];
 function gv(v){
-  [0,1,2,3].forEach(function(i){
+  [0,1,2,3,4].forEach(function(i){
     var vl=document.getElementById('V'+i);if(vl)vl.classList.toggle('on',i===v);
     var nl=document.getElementById('N'+i);if(nl)nl.classList.toggle('on',i===v);
     var bl=document.getElementById('B'+i);if(bl)bl.classList.toggle('on',i===v);
@@ -1357,9 +1741,9 @@ function gv(v){
   CV=v;
   document.getElementById('PT').textContent=VN[v][0];
   document.getElementById('PS').textContent=VN[v][1];
-  if(v===1)rM();if(v===2)rA();if(v===3)rEx();
+  if(v===1)rM();if(v===2)rA();if(v===3)rEx();if(v===4)rEmp();
 }
-function rV(){if(CV===1)rM();else if(CV===2)rA();else if(CV===3)rEx();}
+function rV(){if(CV===1)rM();else if(CV===2)rA();else if(CV===3)rEx();else if(CV===4)rEmp();}
 
 /* ── TOAST ────────────────────── */
 function tt(msg,type){var t=document.getElementById('TT');t.textContent=msg;t.className='toast'+(type==='ok'?' tok':type==='er'?' ter':'');t.classList.add('sh');setTimeout(function(){t.classList.remove('sh');},3000);}
